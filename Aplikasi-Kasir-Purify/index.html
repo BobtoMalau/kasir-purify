@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Kasir - Purify</title>
+    <!-- Tambahan untuk PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007770">
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+
+    <div class="container">
+        <!-- Bagian Kiri: Daftar Produk / Layanan -->
+        <div class="product-section">
+            <h2>Pilih Layanan / Produk</h2>
+            <div class="product-grid" id="productGrid">
+                <!-- Produk akan dimasukkan otomatis lewat JavaScript -->
+            </div>
+        </div>
+
+        <!-- Bagian Kanan: Keranjang & Pembayaran -->
+        <div class="cart-section">
+            <h2>Keranjang Belanja</h2>
+            <div class="cart-items" id="cartItems">
+                <p class="empty-cart">Keranjang masih kosong</p>
+            </div>
+            
+            <div class="cart-summary">
+                <div class="summary-row">
+                    <span>Total:</span>
+                    <span id="totalPrice">Rp 0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Bayar:</span>
+                    <input type="number" id="cashGiven" placeholder="Masukkan jumlah uang">
+                </div>
+                <div class="summary-row">
+                    <span>Kembalian:</span>
+                    <span id="changeAmount">Rp 0</span>
+                </div>
+                <button class="btn-checkout" id="checkoutBtn">Selesaikan Transaksi</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
