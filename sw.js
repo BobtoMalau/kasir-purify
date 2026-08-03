@@ -1,10 +1,11 @@
 const CACHE_NAME = 'purify-cashier-v1';
+const CACHE_NAME = 'purify-cashier-v2'; // Ubah v1 menjadi v2 agar sistem tahu ada update
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/script.js',
-  '/manifest.json'
+  '/kasir-purify/',
+  '/kasir-purify/index.html',
+  '/kasir-purify/style.css',
+  '/kasir-purify/script.js',
+  '/kasir-purify/manifest.json'
 ];
 
 // Proses Install: Menyimpan file ke cache (penyimpanan offline)
