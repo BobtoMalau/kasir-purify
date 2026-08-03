@@ -29,10 +29,14 @@
     <div class="container">
         <!-- Bagian Kiri: Katalog Layanan -->
         <main class="product-section">
-            <div class="section-header">
-                <h2>Katalog Layanan</h2>
-                <p>Pilih item untuk ditambahkan ke keranjang</p>
-            </div>
+            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+             <div>
+                 <h2>Katalog Layanan</h2>
+                 <p>Pilih item untuk ditambahkan ke keranjang</p>
+             </div>
+             <!-- Tombol yang dicari oleh sistem -->
+             <button id="addServiceBtn" class="btn-outline">+ Layanan Baru</button>
+         </div>
             <div class="product-grid" id="productGrid">
                 <!-- Produk dirender oleh JavaScript -->
             </div>
