@@ -1,14 +1,7 @@
-// Ganti URL di bawah dengan URL yang Anda salin dari Google Apps Script di Tahap 2
+// GANTI DENGAN URL GOOGLE APPS SCRIPT MILIK ANDA
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8psGmq7vb3e2nDMOi9FP69REPjPscNbbvnNpl8rjQbEt1MYYrmQ-fhLhz/exec';
-// Data Contoh Produk/Layanan (Bisa disesuaikan nanti)
-const products = [
-    { id: 1, name: "Cuci Kiloan (Reguler)", price: 7000 },
-    { id: 2, name: "Cuci Kiloan (Express)", price: 12000 },
-    { id: 3, name: "Cuci Satuan (Selimut)", price: 20000 },
-    { id: 4, name: "Cuci Sepatu (Sneakers)", price: 35000 },
-    { id: 5, name: "Setrika Saja (Kiloan)", price: 5000 }
-];
 
+let products = [];
 let cart = [];
 
 // Elemen DOM
@@ -20,14 +13,39 @@ const changeAmountElement = document.getElementById('changeAmount');
 const checkoutBtn = document.getElementById('checkoutBtn');
 const customerNameInput = document.getElementById('customerName');
 const customerWAInput = document.getElementById('customerWA');
+const addServiceBtn = document.getElementById('addServiceBtn');
 
-// 1. Tampilkan Produk ke Layar
+// 1. AMBIL KATALOG DARI GOOGLE DRIVE SAAT APLIKASI DIBUKA
+function loadCatalogFromCloud() {
+    productGrid.innerHTML = '<p style="text-align:center; width:100%; color:gray;">Sedang memuat layanan dari Google Drive...</p>';
+    
+    fetch(GOOGLE_SCRIPT_URL)
+        .then(response => response.json())
+        .then(data => {
+            products = data;
+            renderProducts();
+        })
+        .catch(error => {
+            console.error('Error memuat katalog:', error);
+            productGrid.innerHTML = '<p style="text-align:center; width:100%; color:red;">Gagal memuat layanan. Cek koneksi internet.</p>';
+        });
+}
+
+// 2. TAMPILKAN PRODUK KE LAYAR
 function renderProducts() {
     productGrid.innerHTML = '';
-    products.forEach(product => {
+    
+    if(products.length === 0) {
+        productGrid.innerHTML = '<p style="text-align:center; width:100%; color:gray;">Belum ada layanan. Silakan tambah layanan baru.</p>';
+        return;
+    }
+
+    products.forEach((product) => {
         const card = document.createElement('div');
         card.classList.add('product-card');
+        
         card.innerHTML = `
+            <button class="delete-product-btn" onclick="deleteProduct(${product.id}, event)">X</button>
             <h4>${product.name}</h4>
             <p>Rp ${product.price.toLocaleString('id-ID')}</p>
         `;
@@ -36,7 +54,53 @@ function renderProducts() {
     });
 }
 
-// 2. Tambah Produk ke Keranjang
+// 3. TAMBAH LAYANAN BARU KE GOOGLE DRIVE
+addServiceBtn.addEventListener('click', () => {
+    const name = prompt("Masukkan Nama Layanan Baru\n(Contoh: Cuci Boneka Besar):");
+    if (!name) return; 
+    
+    const priceStr = prompt(`Masukkan Harga untuk "${name}"\n(Angka saja tanpa titik, misal: 15000):`);
+    if (!priceStr) return;
+    
+    const price = parseInt(priceStr);
+    if (isNaN(price) || price <= 0) {
+        alert("Harga tidak valid!"); return;
+    }
+
+    const newProduct = { id: Date.now(), name: name, price: price };
+    
+    // Langsung muncul di HP agar cepat
+    products.push(newProduct);
+    renderProducts();
+
+    // Kirim ke Google Drive di latar belakang
+    fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "add_product", product: newProduct })
+    });
+});
+
+// 4. HAPUS LAYANAN DARI GOOGLE DRIVE
+function deleteProduct(id, event) {
+    event.stopPropagation(); 
+    if(confirm("Apakah Anda yakin ingin menghapus layanan ini dari katalog?")) {
+        // Langsung hapus dari layar
+        products = products.filter(p => p.id !== id);
+        renderProducts();
+
+        // Kirim perintah hapus ke Google Drive
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: "delete_product", productId: id })
+        });
+    }
+}
+
+// 5. TAMBAH PRODUK KE KERANJANG
 function addToCart(product) {
     const existingItem = cart.find(item => item.id === product.id);
     if (existingItem) {
@@ -47,46 +111,73 @@ function addToCart(product) {
     renderCart();
 }
 
-// 3. Render / Perbarui Tampilan Keranjang
+// 6. RENDER KERANJANG BELANJA
 function renderCart() {
     if (cart.length === 0) {
-        cartItemsContainer.innerHTML = `<p class="empty-cart">Keranjang masih kosong</p>`;
+        cartItemsContainer.innerHTML = `<div class="empty-state"><p>Keranjang belanja kosong</p></div>`;
         totalPriceElement.innerText = `Rp 0`;
-        changeAmountElement.innerText = `Rp 0`;
+        calculateChange(0);
         return;
     }
 
     cartItemsContainer.innerHTML = '';
     let total = 0;
 
-    cart.forEach(item => {
+    cart.forEach((item, index) => {
         let subtotal = item.price * item.quantity;
         total += subtotal;
 
         const itemRow = document.createElement('div');
         itemRow.classList.add('cart-item-row');
         itemRow.innerHTML = `
-            <span>${item.name} (x${item.quantity})</span>
-            <span>Rp ${subtotal.toLocaleString('id-ID')}</span>
+            <div class="cart-item-info">
+                <span style="font-weight: 600; font-size: 14px; color: var(--text-main);">${item.name}</span>
+                <div class="cart-item-qty">
+                    <input type="number" min="0.1" step="0.1" class="qty-input" data-index="${index}" value="${item.quantity}">
+                    <span style="font-size: 13px; color: var(--text-muted);">x Rp ${item.price.toLocaleString('id-ID')} =</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span style="font-weight: 700; color: var(--text-main);">Rp ${subtotal.toLocaleString('id-ID')}</span>
+                <button class="btn-remove" data-index="${index}">X</button>
+            </div>
         `;
         cartItemsContainer.appendChild(itemRow);
+    });
+
+    document.querySelectorAll('.qty-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const index = e.target.getAttribute('data-index');
+            let newQty = parseFloat(e.target.value);
+            if (newQty <= 0 || isNaN(newQty)) newQty = 1;
+            cart[index].quantity = newQty;
+            renderCart(); 
+        });
+    });
+
+    document.querySelectorAll('.btn-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const index = e.target.getAttribute('data-index');
+            cart.splice(index, 1);
+            renderCart();
+        });
     });
 
     totalPriceElement.innerText = `Rp ${total.toLocaleString('id-ID')}`;
     calculateChange(total);
 }
 
-// 4. Hitung Kembalian Uang
+// 7. HITUNG KEMBALIAN
 function calculateChange(totalPrice) {
     const cash = parseFloat(cashGivenInput.value) || 0;
     const change = cash - totalPrice;
     
     if (change >= 0) {
         changeAmountElement.innerText = `Rp ${change.toLocaleString('id-ID')}`;
-        changeAmountElement.style.color = '#2e7d32';
+        changeAmountElement.style.color = 'var(--success)';
     } else {
         changeAmountElement.innerText = `Kurang Rp ${Math.abs(change).toLocaleString('id-ID')}`;
-        changeAmountElement.style.color = '#c62828';
+        changeAmountElement.style.color = 'var(--danger)';
     }
 }
 
@@ -95,76 +186,49 @@ cashGivenInput.addEventListener('input', () => {
     calculateChange(total);
 });
 
-// 5. Tombol Selesaikan Transaksi
+// 8. SELESAIKAN TRANSAKSI
 checkoutBtn.addEventListener('click', () => {
-    if (cart.length === 0) {
-        alert("Keranjang masih kosong!");
-        return;
-    }
+    if (cart.length === 0) { alert("Keranjang kosong!"); return; }
     
     let total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     let cash = parseFloat(cashGivenInput.value) || 0;
 
-    if (cash < total) {
-        alert("Uang tunai pelanggan kurang!");
-        return;
-    }
+    if (cash < total) { alert("Uang tunai kurang!"); return; }
 
-    // Merangkai rincian barang untuk dikirim ke Google Drive
     let itemDetails = cart.map(item => `${item.name} (${item.quantity}x)`).join(", ");
-
     let transactionData = {
+        action: "transaction", // Memberi tahu server bahwa ini adalah transaksi
         items: itemDetails,
         total: total,
         cash: cash,
         change: cash - total,
-        customerName: customerNameInput.value, // BARU
-        customerWA: customerWAInput.value      // BARU
+        customerName: customerNameInput ? customerNameInput.value : '',
+        customerWA: customerWAInput ? customerWAInput.value : ''
     };
 
-    // Ubah status tombol saat mengirim data
-    checkoutBtn.innerText = "Menyimpan ke Google Drive...";
+    checkoutBtn.innerText = "Menyimpan Data...";
     checkoutBtn.disabled = true;
 
-    // Mengirim data ke Google Drive / Sheets
     fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
-        mode: 'no-cors', // Mencegah error CORS di browser
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(transactionData)
     })
     .then(() => {
-        alert("Transaksi Berhasil & Tersimpan di Google Drive!");
-        
-        // Reset Keranjang & Form
+        alert("Transaksi Berhasil!");
         cart = [];
         cashGivenInput.value = '';
-        customerNameInput.value = ''; // BARU
-        customerWAInput.value = '';   // BARU
+        if (customerNameInput) customerNameInput.value = '';
+        if (customerWAInput) customerWAInput.value = '';
         renderCart();
     })
-    .catch(error => {
-        alert("Gagal menyimpan ke Google Drive. Periksa koneksi internet.");
-        console.error('Error:', error);
-    })
+    .catch(error => alert("Gagal koneksi."))
     .finally(() => {
         checkoutBtn.innerText = "Selesaikan Transaksi";
         checkoutBtn.disabled = false;
     });
 });
 
-// Jalankan fungsi tampil produk saat halaman dimuat
-renderProducts();
-// Daftarkan Service Worker untuk PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('ServiceWorker berhasil didaftarkan dengan scope: ', registration.scope);
-      }, err => {
-        console.log('Pendaftaran ServiceWorker gagal: ', err);
-      });
-  });
-}
+// MULAI APLIKASI: Tarik data dari Google Drive
+loadCatalogFromCloud();
