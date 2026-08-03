@@ -119,7 +119,7 @@ renderProducts();
 // Daftarkan Service Worker untuk PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker.register('/kasir-purify/sw.js')
       .then(registration => {
         console.log('ServiceWorker berhasil didaftarkan dengan scope: ', registration.scope);
       }, err => {
