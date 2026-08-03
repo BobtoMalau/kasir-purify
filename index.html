@@ -3,56 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi Kasir - Purify</title>
-    <!-- Tambahan untuk PWA -->
+    <title>Purify POS</title>
+    <!-- Konfigurasi PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#007770">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <!-- Font Eksternal: Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="container">
-        <!-- Bagian Kiri: Daftar Produk / Layanan -->
-        <div class="product-section">
-            <h2>Pilih Layanan / Produk</h2>
-            <div class="product-grid" id="productGrid">
-                <!-- Produk akan dimasukkan otomatis lewat JavaScript -->
-            </div>
+    <!-- Bilah Navigasi Atas -->
+    <header class="topbar">
+        <div class="brand">
+            <div class="logo-circle">P</div>
+            <h1>PURIFY <span>LAUNDRY</span></h1>
         </div>
+        <div class="user-info">
+            <span class="status-dot"></span>
+            <span>Kasir Aktif</span>
+        </div>
+    </header>
 
-        <!-- Bagian Kanan: Keranjang & Pembayaran -->
-        <div class="cart-section">
-            <h2>Keranjang Belanja</h2>
-            <div class="cart-items" id="cartItems">
-                <p class="empty-cart">Keranjang masih kosong</p>
+    <div class="container">
+        <!-- Bagian Kiri: Katalog Layanan -->
+        <main class="product-section">
+            <div class="section-header">
+                <h2>Katalog Layanan</h2>
+                <p>Pilih item untuk ditambahkan ke keranjang</p>
+            </div>
+            <div class="product-grid" id="productGrid">
+                <!-- Produk dirender oleh JavaScript -->
+            </div>
+        </main>
+
+        <!-- Bagian Kanan: Panel Kasir -->
+        <aside class="cart-section">
+            <div class="cart-header">
+                <h2>Detail Pesanan</h2>
             </div>
             
-            <div class="cart-summary">
-                <!-- KODE BARU: Input Data Pelanggan -->
-                <div class="customer-info" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-                    <input type="text" id="customerName" placeholder="Nama Pelanggan (Wajib)" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
-                    <input type="number" id="customerWA" placeholder="No. WhatsApp (Cth: 0812...)" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+            <div class="cart-items" id="cartItems">
+                <div class="empty-state">
+                    <p>Keranjang belanja kosong</p>
                 </div>
-                <!-- KODE LAMA BERLANJUT DI BAWAH INI -->
-                <div class="summary-row">
-                    <span>Total:</span>
-                    <span id="totalPrice">Rp 0</span>
+            </div>
+            
+            <div class="checkout-panel">
+                <!-- Input Data Pelanggan -->
+                <div class="customer-inputs">
+                    <input type="text" id="customerName" class="input-field" placeholder="Nama Pelanggan (Wajib)">
+                    <input type="number" id="customerWA" class="input-field" placeholder="No. WhatsApp (Cth: 0812...)">
                 </div>
-                <div class="summary-row">
-                    <span>Total:</span>
-                    <span id="totalPrice">Rp 0</span>
+
+                <!-- Rincian Biaya -->
+                <div class="summary-details">
+                    <div class="summary-row">
+                        <span>Total Tagihan</span>
+                        <span id="totalPrice" class="highlight-text">Rp 0</span>
+                    </div>
+                    <div class="summary-row input-row">
+                        <span>Tunai / Bayar</span>
+                        <div class="input-prefix">
+                            <span>Rp</span>
+                            <input type="number" id="cashGiven" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="summary-row divider">
+                        <span>Kembalian</span>
+                        <span id="changeAmount">Rp 0</span>
+                    </div>
                 </div>
-                <div class="summary-row">
-                    <span>Bayar:</span>
-                    <input type="number" id="cashGiven" placeholder="Masukkan jumlah uang">
-                </div>
-                <div class="summary-row">
-                    <span>Kembalian:</span>
-                    <span id="changeAmount">Rp 0</span>
-                </div>
+
                 <button class="btn-checkout" id="checkoutBtn">Selesaikan Transaksi</button>
             </div>
-        </div>
+        </aside>
     </div>
 
     <script src="script.js"></script>
