@@ -18,6 +18,8 @@ const totalPriceElement = document.getElementById('totalPrice');
 const cashGivenInput = document.getElementById('cashGiven');
 const changeAmountElement = document.getElementById('changeAmount');
 const checkoutBtn = document.getElementById('checkoutBtn');
+const customerNameInput = document.getElementById('customerName');
+const customerWAInput = document.getElementById('customerWA');
 
 // 1. Tampilkan Produk ke Layar
 function renderProducts() {
@@ -115,7 +117,9 @@ checkoutBtn.addEventListener('click', () => {
         items: itemDetails,
         total: total,
         cash: cash,
-        change: cash - total
+        change: cash - total,
+        customerName: customerNameInput.value, // BARU
+        customerWA: customerWAInput.value      // BARU
     };
 
     // Ubah status tombol saat mengirim data
@@ -137,6 +141,8 @@ checkoutBtn.addEventListener('click', () => {
         // Reset Keranjang & Form
         cart = [];
         cashGivenInput.value = '';
+        customerNameInput.value = ''; // BARU
+        customerWAInput.value = '';   // BARU
         renderCart();
     })
     .catch(error => {
