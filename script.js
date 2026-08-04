@@ -34,7 +34,11 @@ function checkSession() {
         loginScreen.style.display = 'none';
         mainApp.style.display = 'block';
         activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
-        addServiceBtn.style.display = currentUser.role === 'owner' ? 'block' : 'none';
+        
+        // PERBAIKAN: Mengubah text role menjadi huruf kecil semua agar tidak error
+        const userRole = currentUser.role.toLowerCase(); 
+        addServiceBtn.style.display = userRole === 'owner' ? 'block' : 'none';
+        
         loadCatalogFromCloud();
     } else {
         loginScreen.style.display = 'flex';
@@ -94,7 +98,10 @@ function renderProducts() {
         productGrid.innerHTML = `<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Belum ada layanan di kategori ini.</p>`;
         return;
     }
-    const isOwner = currentUser && currentUser.role === 'owner';
+    
+    // PERBAIKAN: Mengecek role dengan mengabaikan huruf besar/kecil
+    const isOwner = currentUser && currentUser.role.toLowerCase() === 'owner';
+    
     filteredProducts.forEach((product) => {
         const card = document.createElement('div');
         card.classList.add('product-card');
@@ -130,10 +137,10 @@ function renderCart() {
 
     if (cart.length === 0) {
         cartItemsContainer.innerHTML = `<p style="text-align:center; color:gray; font-size:13px; margin:20px 0;">Keranjang kosong</p>`;
-        floatingCart.style.display = 'none'; // Sembunyikan Floating Cart
-        closeCheckoutSheet(); // Otomatis tutup sheet jika kosong
+        floatingCart.style.display = 'none'; 
+        closeCheckoutSheet(); 
     } else {
-        floatingCart.style.display = 'flex'; // Munculkan Floating Cart
+        floatingCart.style.display = 'flex'; 
         cart.forEach((item, index) => {
             let subtotal = item.price * item.quantity;
             total += subtotal; itemCount += item.quantity;
@@ -166,14 +173,12 @@ function renderCart() {
         });
     }
 
-    // Update Angka di Bawah
     fcItemCount.innerText = `${itemCount} Item`;
     fcTotal.innerText = `Rp ${total.toLocaleString('id-ID')}`;
     document.getElementById('totalPrice').innerText = `Rp ${total.toLocaleString('id-ID')}`;
     calculateChange(total);
 }
 
-// Logika Membuka/Menutup Sheet
 function openCheckoutSheet() {
     checkoutOverlay.classList.add('active');
     checkoutSheet.classList.add('active');
@@ -186,7 +191,6 @@ fcOpenBtn.addEventListener('click', openCheckoutSheet);
 closeSheetBtn.addEventListener('click', closeCheckoutSheet);
 checkoutOverlay.addEventListener('click', closeCheckoutSheet);
 
-// Hitung Kembalian
 function calculateChange(totalPrice) {
     const cash = parseFloat(document.getElementById('cashGiven').value) || 0;
     const change = cash - totalPrice;
