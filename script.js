@@ -3,7 +3,7 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8ps
 
 let products = [];
 let cart = [];
-let currentUser = null; // Menyimpan data akun yang sedang login
+let activeCategory = 'Kiloan'; // Kategori yang aktif saat pertama dibuka
 
 // Elemen DOM Aplikasi Utama
 const productGrid = document.getElementById('productGrid');
@@ -134,19 +134,21 @@ function loadCatalogFromCloud() {
 
 function renderProducts() {
     productGrid.innerHTML = '';
-    if(products.length === 0) {
-        productGrid.innerHTML = '<p style="text-align:center; width:100%; color:gray; font-size:14px;">Belum ada layanan tersedia.</p>';
+
+    // Menyaring produk berdasarkan Tab yang sedang aktif
+    const filteredProducts = products.filter(p => (p.category || 'Kiloan') === activeCategory);
+
+    if(filteredProducts.length === 0) {
+        productGrid.innerHTML = `<p style="text-align:center; width:100%; color:gray; font-size:14px; margin-top:20px;">Belum ada layanan di kategori ${activeCategory}.</p>`;
         return;
     }
 
-    // Cek apakah akun ini owner
     const isOwner = currentUser && currentUser.role === 'owner';
 
-    products.forEach((product) => {
+    filteredProducts.forEach((product) => {
         const card = document.createElement('div');
         card.classList.add('product-card');
-        
-        // Render tombol silang HANYA jika yang login adalah Owner
+
         card.innerHTML = `
             ${isOwner ? `<button class="delete-product-btn" onclick="deleteProduct(${product.id}, event)">X</button>` : ''}
             <h4>${product.name}</h4>
@@ -157,17 +159,51 @@ function renderProducts() {
     });
 }
 
-addServiceBtn.addEventListener('click', () => {
-    const name = prompt("Masukkan Nama Layanan Baru\n(Contoh: Cuci Karpet):");
-    if (!name) return; 
-    const priceStr = prompt(`Harga untuk "${name}"\n(Angka tanpa titik):`);
-    if (!priceStr) return;
-    const price = parseInt(priceStr);
-    if (isNaN(price) || price <= 0) { alert("Harga tidak valid!"); return; }
+// --- LOGIKA TAB KATEGORI ---
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        // Hapus warna tombol aktif sebelumnya
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        // Beri warna pada tombol yang diklik
+        e.target.classList.add('active');
+        // Set kategori aktif dan perbarui layar
+        activeCategory = e.target.getAttribute('data-category');
+        renderProducts();
+    });
+});
 
-    const newProduct = { id: Date.now(), name: name, price: price };
+// --- LOGIKA POP-UP TAMBAH LAYANAN ---
+const addProductModal = document.getElementById('addProductModal');
+const cancelAddBtn = document.getElementById('cancelAddBtn');
+const saveProductBtn = document.getElementById('saveProductBtn');
+
+// Buka Modal
+addServiceBtn.addEventListener('click', () => {
+    document.getElementById('newProductName').value = '';
+    document.getElementById('newProductPrice').value = '';
+    addProductModal.style.display = 'flex';
+});
+
+// Tutup Modal
+cancelAddBtn.addEventListener('click', () => {
+    addProductModal.style.display = 'none';
+});
+
+// Simpan Data dari Modal
+saveProductBtn.addEventListener('click', () => {
+    const name = document.getElementById('newProductName').value.trim();
+    const priceStr = document.getElementById('newProductPrice').value;
+    const category = document.getElementById('newProductCategory').value;
+
+    const price = parseInt(priceStr);
+    if (!name || isNaN(price) || price <= 0) { 
+        alert("Nama dan Harga harus diisi dengan benar!"); return; 
+    }
+
+    const newProduct = { id: Date.now(), name: name, price: price, category: category };
     products.push(newProduct);
     renderProducts();
+    addProductModal.style.display = 'none'; // Tutup modal
 
     fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
