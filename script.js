@@ -292,29 +292,35 @@ function generateInvoiceNumber() {
 // --- SELESAIKAN TRANSAKSI (DIPERBARUI DENGAN INVOICE) ---
 checkoutBtn.addEventListener('click', () => {
     if (cart.length === 0) return;
-    let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
-    let cash = parseFloat(document.getElementById('cashGiven').value) || 0;
     
-    if (cash < total) { 
-        alert("Uang pembayaran kurang!"); 
+    let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+    const paymentStatus = document.getElementById('paymentStatus').value;
+    let cash = parseFloat(document.getElementById('cashGiven').value) || 0;
+
+    // Validasi: Jika Lunas, uang tunai tidak boleh kurang dari total
+    if (paymentStatus === 'Lunas' && cash < total) { 
+        alert("Uang pembayaran kurang untuk status Lunas!"); 
         return; 
     }
 
-    // 1. Buat nomor invoice baru
+    // Jika Belum Lunas, uang tunai diset 0
+    if (paymentStatus === 'Belum Lunas') {
+        cash = 0;
+    }
+
     const invoiceNumber = generateInvoiceNumber();
-    
     let itemDetails = cart.map(item => `${item.name} (${item.quantity}x)`).join(", ");
     
-    // 2. Masukkan nomor invoice ke dalam data yang akan dikirim
     let transactionData = {
         action: "transaction", 
-        invoice: invoiceNumber, // INI DATA BARUNYA
+        invoice: invoiceNumber, 
         items: itemDetails, 
         total: total, 
         cash: cash, 
-        change: cash - total,
+        change: paymentStatus === 'Lunas' ? (cash - total) : 0,
         customerName: document.getElementById('customerName').value,
-        customerWA: document.getElementById('customerWA').value
+        customerWA: document.getElementById('customerWA').value,
+        paymentStatus: paymentStatus // DATA STATUS BARU
     };
 
     checkoutBtn.innerText = "Memproses..."; 
@@ -327,12 +333,13 @@ checkoutBtn.addEventListener('click', () => {
         body: JSON.stringify(transactionData) 
     })
     .then(() => {
-        // Tampilkan nomor invoice di layar kasir saat berhasil
-        alert(`Transaksi Berhasil!\nNomor Invoice: ${invoiceNumber}`);
+        alert(`Transaksi Berhasil disimpan!\nNo. Invoice: ${invoiceNumber}\nStatus: ${paymentStatus}`);
         
         // Reset Keranjang & Form
         cart = []; 
         document.getElementById('cashGiven').value = '';
+        document.getElementById('cashGiven.disabled') = false;
+        document.getElementById('paymentStatus').value = 'Lunas'; // Reset ke Lunas
         document.getElementById('customerName').value = ''; 
         document.getElementById('customerWA').value = '';
         renderCart(); 
@@ -344,6 +351,21 @@ checkoutBtn.addEventListener('click', () => {
         checkoutBtn.disabled = false; 
     });
 });
-
+// --- ATURAN OTOMATIS STATUS PEMBAYARAN ---
+document.getElementById('paymentStatus').addEventListener('change', (e) => {
+    const status = e.target.value;
+    const cashInput = document.getElementById('cashGiven');
+    
+    if (status === 'Belum Lunas') {
+        cashInput.value = '0';
+        cashInput.disabled = true; // Kunci input uang karena bayar nanti
+        cashInput.style.background = '#e2e8f0';
+    } else {
+        cashInput.disabled = false; // Buka kembali jika Lunas
+        cashInput.style.background = '#f8fafc';
+    }
+    let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+    calculateChange(total);
+});
 // Pastikan checkSession() tetap ada di baris paling akhir file Anda
 checkSession();

@@ -86,6 +86,16 @@
                     <input type="tel" id="customerWA" class="input-field" placeholder="No. WhatsApp (Otomatis terisi)">
                     
                     <h3 style="margin-top: 15px;">Pembayaran</h3>
+                    
+                    <!-- KODE BARU: PILIHAN STATUS PEMBAYARAN -->
+                    <div class="summary-row" style="margin-bottom: 12px;">
+                        <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Status Pembayaran</span>
+                        <select id="paymentStatus" class="input-field" style="width: 150px; margin-bottom: 0; padding: 8px; font-weight: 600; color: var(--primary);">
+                            <option value="Lunas">Lunas</option>
+                            <option value="Belum Lunas">Belum Lunas (Nanti)</option>
+                        </select>
+                    </div>
+
                     <div class="summary-row">
                         <span>Total Tagihan</span>
                         <span id="totalPrice" class="highlight-text">Rp 0</span>
