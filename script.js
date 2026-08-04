@@ -218,30 +218,71 @@ document.getElementById('saveProductBtn').addEventListener('click', () => {
     fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "add_product", product: newP }) });
 });
 
-// --- SELESAIKAN TRANSAKSI ---
+// --- MESIN PEMBUAT NOMOR INVOICE OTOMATIS ---
+function generateInvoiceNumber() {
+    const date = new Date();
+    const yy = String(date.getFullYear()).slice(-2); // Ambil 2 digit tahun
+    const mm = String(date.getMonth() + 1).padStart(2, '0'); // Bulan
+    const dd = String(date.getDate()).padStart(2, '0'); // Tanggal
+    const randomNum = Math.floor(1000 + Math.random() * 9000); // 4 digit angka acak
+    return `INV-${yy}${mm}${dd}-${randomNum}`;
+}
+
+// --- SELESAIKAN TRANSAKSI (DIPERBARUI DENGAN INVOICE) ---
 checkoutBtn.addEventListener('click', () => {
     if (cart.length === 0) return;
     let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
     let cash = parseFloat(document.getElementById('cashGiven').value) || 0;
-    if (cash < total) { alert("Uang pembayaran kurang!"); return; }
+    
+    if (cash < total) { 
+        alert("Uang pembayaran kurang!"); 
+        return; 
+    }
 
+    // 1. Buat nomor invoice baru
+    const invoiceNumber = generateInvoiceNumber();
+    
     let itemDetails = cart.map(item => `${item.name} (${item.quantity}x)`).join(", ");
+    
+    // 2. Masukkan nomor invoice ke dalam data yang akan dikirim
     let transactionData = {
-        action: "transaction", items: itemDetails, total, cash, change: cash - total,
+        action: "transaction", 
+        invoice: invoiceNumber, // INI DATA BARUNYA
+        items: itemDetails, 
+        total: total, 
+        cash: cash, 
+        change: cash - total,
         customerName: document.getElementById('customerName').value,
         customerWA: document.getElementById('customerWA').value
     };
 
-    checkoutBtn.innerText = "Memproses..."; checkoutBtn.disabled = true;
-    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transactionData) })
-    .then(() => {
-        alert("Transaksi Berhasil!");
-        cart = []; document.getElementById('cashGiven').value = '';
-        document.getElementById('customerName').value = ''; document.getElementById('customerWA').value = '';
-        renderCart(); closeCheckoutSheet();
+    checkoutBtn.innerText = "Memproses..."; 
+    checkoutBtn.disabled = true;
+    
+    fetch(GOOGLE_SCRIPT_URL, { 
+        method: 'POST', 
+        mode: 'no-cors', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(transactionData) 
     })
-    .catch(() => alert("Koneksi gagal."))
-    .finally(() => { checkoutBtn.innerText = "Selesaikan Transaksi"; checkoutBtn.disabled = false; });
+    .then(() => {
+        // Tampilkan nomor invoice di layar kasir saat berhasil
+        alert(`Transaksi Berhasil!\nNomor Invoice: ${invoiceNumber}`);
+        
+        // Reset Keranjang & Form
+        cart = []; 
+        document.getElementById('cashGiven').value = '';
+        document.getElementById('customerName').value = ''; 
+        document.getElementById('customerWA').value = '';
+        renderCart(); 
+        closeCheckoutSheet();
+    })
+    .catch(() => alert("Koneksi gagal. Periksa internet Anda."))
+    .finally(() => { 
+        checkoutBtn.innerText = "Selesaikan Transaksi"; 
+        checkoutBtn.disabled = false; 
+    });
 });
 
+// Pastikan checkSession() tetap ada di baris paling akhir file Anda
 checkSession();
