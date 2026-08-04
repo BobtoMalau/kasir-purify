@@ -107,15 +107,24 @@ function populateCustomerList() {
     });
 }
 
-// Fitur Ajaib Dibalik: Saat Nama diketik/dipilih, otomatis isi kolom Nomor WhatsApp!
+// --- PENCARIAN PELANGGAN YANG LEBIH KUAT ---
 document.getElementById('customerName').addEventListener('input', (e) => {
-    const typedName = e.target.value.trim();
-    // Cari data berdasarkan Nama (tidak peduli huruf besar/kecil)
-    const foundCustomer = customers.find(c => c.name.toLowerCase() === typedName.toLowerCase());
+    checkAndFillCustomer(e.target.value);
+});
+
+document.getElementById('customerName').addEventListener('change', (e) => {
+    checkAndFillCustomer(e.target.value);
+});
+
+function checkAndFillCustomer(typedName) {
+    typedName = typedName.trim().toLowerCase();
+    if (!typedName) return;
+
+    // Cari pelanggan yang namanya cocok (mengabaikan huruf besar/kecil)
+    const foundCustomer = customers.find(c => c.name && c.name.toLowerCase() === typedName);
     
+    const waInput = document.getElementById('customerWA');
     if (foundCustomer) {
-        // Jika nama ditemukan, otomatis isi nomor WhatsApp dan beri efek sorotan
-        const waInput = document.getElementById('customerWA');
         waInput.value = foundCustomer.wa;
         waInput.style.borderColor = 'var(--primary)';
         waInput.style.backgroundColor = '#e0f2f1';
@@ -124,8 +133,7 @@ document.getElementById('customerName').addEventListener('input', (e) => {
             waInput.style.backgroundColor = '#f8fafc';
         }, 1000);
     }
-});
-
+}
 // Fitur Ajaib: Saat nomor WA diketik/dipilih, otomatis isi kolom Nama!
 document.getElementById('customerWA').addEventListener('input', (e) => {
     const typedWA = e.target.value;
