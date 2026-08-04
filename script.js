@@ -3,8 +3,9 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8ps
 
 let products = [];
 let cart = [];
+let currentUser = null; // Menyimpan data akun yang sedang login
 
-// Elemen DOM
+// Elemen DOM Aplikasi Utama
 const productGrid = document.getElementById('productGrid');
 const cartItemsContainer = document.getElementById('cartItems');
 const totalPriceElement = document.getElementById('totalPrice');
@@ -15,9 +16,110 @@ const customerNameInput = document.getElementById('customerName');
 const customerWAInput = document.getElementById('customerWA');
 const addServiceBtn = document.getElementById('addServiceBtn');
 
-// 1. AMBIL KATALOG DARI GOOGLE DRIVE SAAT APLIKASI DIBUKA
+// Elemen DOM Layar Login
+const loginScreen = document.getElementById('loginScreen');
+const mainApp = document.getElementById('mainApp');
+const loginUsername = document.getElementById('loginUsername');
+const loginPin = document.getElementById('loginPin');
+const loginBtn = document.getElementById('loginBtn');
+const loginMessage = document.getElementById('loginMessage');
+const activeUserLabel = document.getElementById('activeUserLabel');
+const logoutBtn = document.getElementById('logoutBtn');
+
+// --- SISTEM LOGIN & SESI ---
+
+// 1. Cek apakah sebelumnya sudah login
+function checkSession() {
+    const savedUser = localStorage.getItem('purify_session');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        loginScreen.style.display = 'none';
+        mainApp.style.display = 'flex';
+        
+        // Tampilkan nama dan role di pojok kanan atas
+        activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
+        
+        // Atur izin (Role)
+        applyRoleRestrictions();
+        
+        // Mulai tarik data dari Google Drive
+        loadCatalogFromCloud();
+    } else {
+        loginScreen.style.display = 'flex';
+        mainApp.style.display = 'none';
+    }
+}
+
+// 2. Terapkan Izin (Owner vs Kasir)
+function applyRoleRestrictions() {
+    if (currentUser.role === 'kasir') {
+        addServiceBtn.style.display = 'none'; // Sembunyikan tombol tambah layanan
+    } else {
+        addServiceBtn.style.display = 'inline-block'; // Owner bisa melihatnya
+    }
+}
+
+// 3. Proses Login saat tombol Masuk diklik
+loginBtn.addEventListener('click', () => {
+    const u = loginUsername.value.trim();
+    const p = loginPin.value.trim();
+    
+    if (!u || !p) {
+        loginMessage.innerText = "Isi Username dan PIN!";
+        return;
+    }
+    
+    loginBtn.innerText = "Memeriksa...";
+    loginBtn.disabled = true;
+    loginMessage.innerText = "";
+    
+    // Perhatikan: Kita MENGHAPUS "mode: 'no-cors'" dan menggunakan 'text/plain' 
+    // agar kita bisa membaca balasan JSON dari Google (Sukses/Gagal).
+    fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' }, 
+        body: JSON.stringify({ action: "login", username: u, pin: p })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === "success") {
+            // Simpan sesi ke memori HP
+            localStorage.setItem('purify_session', JSON.stringify({
+                username: u,
+                role: data.role // 'owner' atau 'kasir'
+            }));
+            loginUsername.value = '';
+            loginPin.value = '';
+            checkSession(); // Masuk ke aplikasi utama
+        } else {
+            loginMessage.innerText = "Username atau PIN salah!";
+        }
+    })
+    .catch(error => {
+        loginMessage.innerText = "Gagal terhubung. Cek internet!";
+        console.error(error);
+    })
+    .finally(() => {
+        loginBtn.innerText = "Masuk Sekarang";
+        loginBtn.disabled = false;
+    });
+});
+
+// 4. Tombol Logout (Keluar)
+logoutBtn.addEventListener('click', () => {
+    if(confirm("Apakah Anda yakin ingin keluar?")) {
+        localStorage.removeItem('purify_session');
+        currentUser = null;
+        cart = []; // Kosongkan keranjang
+        checkSession();
+    }
+});
+
+
+// --- SISTEM APLIKASI UTAMA (Katalog & Transaksi) ---
+
 function loadCatalogFromCloud() {
-    productGrid.innerHTML = '<p style="text-align:center; width:100%; color:gray;">Sedang memuat layanan dari Google Drive...</p>';
+    productGrid.innerHTML = '<p style="text-align:center; width:100%; color:gray; font-size:14px;">Memuat layanan dari sistem...</p>';
     
     fetch(GOOGLE_SCRIPT_URL)
         .then(response => response.json())
@@ -26,26 +128,27 @@ function loadCatalogFromCloud() {
             renderProducts();
         })
         .catch(error => {
-            console.error('Error memuat katalog:', error);
-            productGrid.innerHTML = '<p style="text-align:center; width:100%; color:red;">Gagal memuat layanan. Cek koneksi internet.</p>';
+            productGrid.innerHTML = '<p style="text-align:center; width:100%; color:#e53e3e; font-size:14px;">Gagal memuat katalog.</p>';
         });
 }
 
-// 2. TAMPILKAN PRODUK KE LAYAR
 function renderProducts() {
     productGrid.innerHTML = '';
-    
     if(products.length === 0) {
-        productGrid.innerHTML = '<p style="text-align:center; width:100%; color:gray;">Belum ada layanan. Silakan tambah layanan baru.</p>';
+        productGrid.innerHTML = '<p style="text-align:center; width:100%; color:gray; font-size:14px;">Belum ada layanan tersedia.</p>';
         return;
     }
+
+    // Cek apakah akun ini owner
+    const isOwner = currentUser && currentUser.role === 'owner';
 
     products.forEach((product) => {
         const card = document.createElement('div');
         card.classList.add('product-card');
         
+        // Render tombol silang HANYA jika yang login adalah Owner
         card.innerHTML = `
-            <button class="delete-product-btn" onclick="deleteProduct(${product.id}, event)">X</button>
+            ${isOwner ? `<button class="delete-product-btn" onclick="deleteProduct(${product.id}, event)">X</button>` : ''}
             <h4>${product.name}</h4>
             <p>Rp ${product.price.toLocaleString('id-ID')}</p>
         `;
@@ -54,26 +157,18 @@ function renderProducts() {
     });
 }
 
-// 3. TAMBAH LAYANAN BARU KE GOOGLE DRIVE
 addServiceBtn.addEventListener('click', () => {
-    const name = prompt("Masukkan Nama Layanan Baru\n(Contoh: Cuci Boneka Besar):");
+    const name = prompt("Masukkan Nama Layanan Baru\n(Contoh: Cuci Karpet):");
     if (!name) return; 
-    
-    const priceStr = prompt(`Masukkan Harga untuk "${name}"\n(Angka saja tanpa titik, misal: 15000):`);
+    const priceStr = prompt(`Harga untuk "${name}"\n(Angka tanpa titik):`);
     if (!priceStr) return;
-    
     const price = parseInt(priceStr);
-    if (isNaN(price) || price <= 0) {
-        alert("Harga tidak valid!"); return;
-    }
+    if (isNaN(price) || price <= 0) { alert("Harga tidak valid!"); return; }
 
     const newProduct = { id: Date.now(), name: name, price: price };
-    
-    // Langsung muncul di HP agar cepat
     products.push(newProduct);
     renderProducts();
 
-    // Kirim ke Google Drive di latar belakang
     fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -82,15 +177,12 @@ addServiceBtn.addEventListener('click', () => {
     });
 });
 
-// 4. HAPUS LAYANAN DARI GOOGLE DRIVE
 function deleteProduct(id, event) {
     event.stopPropagation(); 
-    if(confirm("Apakah Anda yakin ingin menghapus layanan ini dari katalog?")) {
-        // Langsung hapus dari layar
+    if(confirm("Yakin hapus layanan ini dari katalog seluruh sistem?")) {
         products = products.filter(p => p.id !== id);
         renderProducts();
 
-        // Kirim perintah hapus ke Google Drive
         fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
             mode: 'no-cors',
@@ -100,7 +192,6 @@ function deleteProduct(id, event) {
     }
 }
 
-// 5. TAMBAH PRODUK KE KERANJANG
 function addToCart(product) {
     const existingItem = cart.find(item => item.id === product.id);
     if (existingItem) {
@@ -111,7 +202,6 @@ function addToCart(product) {
     renderCart();
 }
 
-// 6. RENDER KERANJANG BELANJA
 function renderCart() {
     if (cart.length === 0) {
         cartItemsContainer.innerHTML = `<div class="empty-state"><p>Keranjang belanja kosong</p></div>`;
@@ -167,11 +257,9 @@ function renderCart() {
     calculateChange(total);
 }
 
-// 7. HITUNG KEMBALIAN
 function calculateChange(totalPrice) {
     const cash = parseFloat(cashGivenInput.value) || 0;
     const change = cash - totalPrice;
-    
     if (change >= 0) {
         changeAmountElement.innerText = `Rp ${change.toLocaleString('id-ID')}`;
         changeAmountElement.style.color = 'var(--success)';
@@ -186,7 +274,6 @@ cashGivenInput.addEventListener('input', () => {
     calculateChange(total);
 });
 
-// 8. SELESAIKAN TRANSAKSI
 checkoutBtn.addEventListener('click', () => {
     if (cart.length === 0) { alert("Keranjang kosong!"); return; }
     
@@ -197,7 +284,7 @@ checkoutBtn.addEventListener('click', () => {
 
     let itemDetails = cart.map(item => `${item.name} (${item.quantity}x)`).join(", ");
     let transactionData = {
-        action: "transaction", // Memberi tahu server bahwa ini adalah transaksi
+        action: "transaction",
         items: itemDetails,
         total: total,
         cash: cash,
@@ -209,6 +296,7 @@ checkoutBtn.addEventListener('click', () => {
     checkoutBtn.innerText = "Menyimpan Data...";
     checkoutBtn.disabled = true;
 
+    // Saat transaksi kita kembalikan mode: 'no-cors' agar tidak terblokir
     fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -223,12 +311,12 @@ checkoutBtn.addEventListener('click', () => {
         if (customerWAInput) customerWAInput.value = '';
         renderCart();
     })
-    .catch(error => alert("Gagal koneksi."))
+    .catch(error => alert("Gagal koneksi internet."))
     .finally(() => {
         checkoutBtn.innerText = "Selesaikan Transaksi";
         checkoutBtn.disabled = false;
     });
 });
 
-// MULAI APLIKASI: Tarik data dari Google Drive
-loadCatalogFromCloud();
+// JALANKAN SAAT APLIKASI DIBUKA PERTAMA KALI
+checkSession();
