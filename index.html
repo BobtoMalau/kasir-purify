@@ -43,39 +43,29 @@
             </div>
         </header>
 
-        <!-- Kategori (Scroll Horizontal) -->
-        <div class="category-scroll">
-            <button class="tab-btn active" data-category="Kiloan">Kiloan</button>
-            <button class="tab-btn" data-category="Satuan">Satuan</button>
+        <!-- KONTEN HALAMAN KASIR (POS) -->
+        <div id="posView" class="view-section active">
+            <div class="category-scroll">
+                <button class="tab-btn active" data-category="Kiloan">Kiloan</button>
+                <button class="tab-btn" data-category="Satuan">Satuan</button>
+            </div>
+            <main class="product-area">
+                <div class="product-grid" id="productGrid">
+                    <!-- Produk dirender JS -->
+                </div>
+            </main>
         </div>
 
-        <!-- Area Katalog Produk -->
-        <main class="product-area">
-            <div class="product-grid" id="productGrid">
-                <!-- Produk dirender JS -->
+        <!-- KONTEN HALAMAN RIWAYAT -->
+        <div id="historyView" class="view-section" style="display: none;">
+            <div class="history-header">
+                <h2>Riwayat Transaksi</h2>
+                <button id="refreshHistoryBtn" class="icon-btn" title="Muat Ulang">🔄</button>
             </div>
-        </main>
-        <!-- ... (header dan kategori tetap ada di atasnya) ... -->
-
-<!-- KONTEN HALAMAN KASIR -->
-<div id="posView" class="view-section active">
-    <div class="category-scroll">
-        <button class="tab-btn active" data-category="Kiloan">Kiloan</button>
-        <button class="tab-btn" data-category="Satuan">Satuan</button>
-    </div>
-    <main class="product-area">
-        <div class="product-grid" id="productGrid"></div>
-    </main>
-</div>
-
-<!-- KONTEN HALAMAN RIWAYAT (BARU) -->
-<div id="historyView" class="view-section" style="display: none;">
-    <div class="history-header">
-        <h2>Riwayat Transaksi</h2>
-        <button id="refreshHistoryBtn" class="icon-btn" title="Muat Ulang">🔄</button>
-    </div>
-    <div class="history-list" id="historyList"></div>
-</div>
+            <div class="history-list" id="historyList">
+                <!-- Data riwayat dirender oleh JavaScript -->
+            </div>
+        </div>
 
         <!-- FLOATING CART (Melayang di Bawah) -->
         <div id="floatingCart" class="floating-cart" style="display: none;">
@@ -99,16 +89,13 @@
                 
                 <div class="payment-section">
                     <h3>Data Pelanggan</h3>
-                    <!-- Kolom Nama sekarang di atas, dilengkapi fitur pencarian (datalist) -->
                     <input type="text" id="customerName" class="input-field" placeholder="Nama Pelanggan (Ketik untuk cari...)" list="customerList" autocomplete="off">
                     <datalist id="customerList"></datalist>
                     
-                    <!-- Kolom WA di bawah, yang akan terisi otomatis -->
                     <input type="tel" id="customerWA" class="input-field" placeholder="No. WhatsApp (Otomatis terisi)">
                     
                     <h3 style="margin-top: 15px;">Pembayaran</h3>
                     
-                    <!-- KODE BARU: PILIHAN STATUS PEMBAYARAN -->
                     <div class="summary-row" style="margin-bottom: 12px;">
                         <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Status Pembayaran</span>
                         <select id="paymentStatus" class="input-field" style="width: 150px; margin-bottom: 0; padding: 8px; font-weight: 600; color: var(--primary);">
@@ -166,21 +153,20 @@
             </div>
         </div>
 
-    </div>
+        <!-- BILAH NAVIGASI BAWAH -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="pos">
+                <span class="nav-icon">🛒</span>
+                <span class="nav-label">Kasir</span>
+            </button>
+            <button class="nav-item" data-target="history">
+                <span class="nav-icon">📋</span>
+                <span class="nav-label">Riwayat</span>
+            </button>
+        </nav>
 
-   <!-- BILAH NAVIGASI BAWAH -->
-    <nav class="bottom-nav">
-        <button class="nav-item active" data-target="pos">
-            <span class="nav-icon">🛒</span>
-            <span class="nav-label">Kasir</span>
-        </button>
-        <button class="nav-item" data-target="history">
-            <span class="nav-icon">📋</span>
-            <span class="nav-label">Riwayat</span>
-        </button>
-    </nav>
-</div> <!-- Penutup #mainApp -->
+    </div> <!-- Penutup #mainApp -->
 
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
