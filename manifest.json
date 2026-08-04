@@ -2,7 +2,7 @@
   "name": "Purify Cashier",
   "short_name": "Purify",
   "description": "Aplikasi Kasir Laundry Purify",
-  "start_url": "/index.html",
+  "start_url": "https://bobtomalau.github.io/kasir-purify/",
   "display": "standalone",
   "background_color": "#f4f7f6",
   "theme_color": "#007770",
