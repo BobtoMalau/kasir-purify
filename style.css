@@ -161,3 +161,19 @@ body { background-color: var(--bg-color); color: var(--text-main); -webkit-tap-h
 }
 .badge.lunas { background: #d1fae5; color: #065f46; }
 .badge.belum { background: #fee2e2; color: #991b1b; }
+/* --- TOMBOL WHATSAPP DI RIWAYAT --- */
+.btn-wa {
+    background: #25D366; /* Warna Hijau Khas WhatsApp */
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
+    transition: 0.2s;
+}
+.btn-wa:active {
+    transform: scale(0.95);
+}

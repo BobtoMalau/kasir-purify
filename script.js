@@ -444,6 +444,32 @@ document.getElementById('refreshHistoryBtn').addEventListener('click', () => {
     alert("Data riwayat diperbarui!");
 });
 
+
+// --- FUNGSI KLIK TOMBOL WA DARI RIWAYAT ---
+window.resendWA = function(invoice, wa, name, itemsStr, total, status) {
+    let formattedWA = String(wa).replace(/\D/g, ''); // Buang spasi/tanda hubung
+    if (formattedWA.startsWith('0')) formattedWA = '62' + formattedWA.substring(1);
+    
+    // Ubah format rincian agar turun ke bawah (mengganti koma menjadi baris baru)
+    let formattedItems = itemsStr.split(', ').join('\n- ');
+    
+    let msg = `*PURIFY LAUNDRY*\n`;
+    msg += `--------------------------------------\n`;
+    msg += `*No. Nota:* ${invoice}\n`;
+    msg += `*Pelanggan:* ${name || 'Umum'}\n`;
+    msg += `*Status:* ${status}\n`;
+    msg += `--------------------------------------\n`;
+    msg += `*Rincian Pesanan:*\n`;
+    msg += `- ${formattedItems}\n`;
+    msg += `--------------------------------------\n`;
+    msg += `*TOTAL TAGIHAN: Rp ${Number(total).toLocaleString('id-ID')}*\n`;
+    msg += `--------------------------------------\n`;
+    msg += `Terima kasih telah mempercayakan cucian Anda di tempat kami! 🙏`;
+
+    window.open(`https://wa.me/${formattedWA}?text=${encodeURIComponent(msg)}`, '_blank');
+};
+
+
 // --- RENDER HALAMAN RIWAYAT TRANSAKSI ---
 function renderHistory() {
     const historyList = document.getElementById('historyList');
@@ -467,6 +493,9 @@ function renderHistory() {
         } catch(e) {}
 
         const isLunas = trx.status === 'Lunas';
+        
+        // Pengecekan apakah nomor WA ada dan valid
+        const hasWA = trx.wa && String(trx.wa).length > 8;
 
         card.innerHTML = `
             <div class="hc-top">
@@ -481,8 +510,11 @@ function renderHistory() {
                     <span class="hc-cust">👤 ${trx.name || 'Umum'} (${trx.wa || '-'})</span><br>
                     <span class="badge ${isLunas ? 'lunas' : 'belum'}">${trx.status}</span>
                 </div>
-                <div class="hc-total">
-                    Rp ${Number(trx.total).toLocaleString('id-ID')}
+                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                    <div class="hc-total">Rp ${Number(trx.total).toLocaleString('id-ID')}</div>
+                    
+                    <!-- KODE TOMBOL WA BARU -->
+                    ${hasWA ? `<button class="btn-wa" onclick="resendWA('${trx.invoice}', '${trx.wa}', '${trx.name}', '${trx.items}', ${trx.total}, '${trx.status}')">Kirim Ulang WA</button>` : ''}
                 </div>
             </div>
         `;
