@@ -294,13 +294,15 @@ function generateInvoiceNumber() {
 
 // --- FUNGSI BARU: FORMAT NOMOR & STRUK WHATSAPP ---
 function sendWhatsAppReceipt(invoice, wa, name, cartData, total, status) {
-    // 1. Ubah nomor HP awalan '0' menjadi '62' sesuai standar WhatsApp
-    let formattedWA = wa.replace(/\D/g, ''); // Hapus karakter selain angka
+    let formattedWA = String(wa).replace(/\D/g, ''); // Hapus karakter selain angka
+    
+    // LOGIKA BARU: Antisipasi angka 0 yang hilang dari Google Sheets
     if (formattedWA.startsWith('0')) {
         formattedWA = '62' + formattedWA.substring(1);
+    } else if (formattedWA.startsWith('8')) {
+        formattedWA = '62' + formattedWA; // Jika mulai dari 8, langsung tambah 62
     }
 
-    // 2. Desain teks struk (Gunakan \n untuk baris baru, dan *teks* untuk tebal)
     let msg = `*PURIFY LAUNDRY*\n`;
     msg += `--------------------------------------\n`;
     msg += `*No. Nota:* ${invoice}\n`;
@@ -309,7 +311,6 @@ function sendWhatsAppReceipt(invoice, wa, name, cartData, total, status) {
     msg += `--------------------------------------\n`;
     msg += `*Rincian Pesanan:*\n`;
     
-    // Looping semua item di keranjang
     cartData.forEach(item => {
         let subtotal = item.price * item.quantity;
         msg += `- ${item.name} (${item.quantity}x) : Rp ${subtotal.toLocaleString('id-ID')}\n`;
@@ -320,11 +321,9 @@ function sendWhatsAppReceipt(invoice, wa, name, cartData, total, status) {
     msg += `--------------------------------------\n`;
     msg += `Terima kasih telah mempercayakan cucian Anda di tempat kami! 🙏`;
 
-    // 3. Ubah teks menjadi format link dan buka WhatsApp
     const encodedMsg = encodeURIComponent(msg);
     const waLink = `https://wa.me/${formattedWA}?text=${encodedMsg}`;
     
-    // Buka WhatsApp di tab baru atau aplikasi WA di HP
     window.open(waLink, '_blank');
 }
 
@@ -447,10 +446,15 @@ document.getElementById('refreshHistoryBtn').addEventListener('click', () => {
 
 // --- FUNGSI KLIK TOMBOL WA DARI RIWAYAT ---
 window.resendWA = function(invoice, wa, name, itemsStr, total, status) {
-    let formattedWA = String(wa).replace(/\D/g, ''); // Buang spasi/tanda hubung
-    if (formattedWA.startsWith('0')) formattedWA = '62' + formattedWA.substring(1);
+    let formattedWA = String(wa).replace(/\D/g, ''); 
     
-    // Ubah format rincian agar turun ke bawah (mengganti koma menjadi baris baru)
+    // LOGIKA BARU: Antisipasi angka 0 yang hilang dari Google Sheets
+    if (formattedWA.startsWith('0')) {
+        formattedWA = '62' + formattedWA.substring(1);
+    } else if (formattedWA.startsWith('8')) {
+        formattedWA = '62' + formattedWA; 
+    }
+    
     let formattedItems = itemsStr.split(', ').join('\n- ');
     
     let msg = `*PURIFY LAUNDRY*\n`;
