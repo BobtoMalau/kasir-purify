@@ -99,3 +99,65 @@ body { background-color: var(--bg-color); color: var(--text-main); -webkit-tap-h
     .bottom-sheet { width: 450px; left: auto; right: 0; border-radius: 24px 0 0 24px; height: 100vh; transform: translateX(100%); }
     .bottom-sheet.active { transform: translateX(0); }
 }
+/* --- BOTTOM NAVIGATION BAR --- */
+.bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; width: 100%;
+    height: 60px;
+    background: var(--surface);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 500;
+}
+
+.nav-item {
+    background: none; border: none;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 2px; cursor: pointer; color: var(--text-muted);
+    font-size: 11px; font-weight: 600; width: 50%;
+    transition: 0.2s;
+}
+
+.nav-icon { font-size: 20px; }
+.nav-item.active { color: var(--primary); }
+
+/* Penyesuaian agar konten tidak tertutup nav bar & floating cart */
+.product-area { padding: 0 20px 140px 20px; }
+
+/* --- HALAMAN RIWAYAT TRANSAKSI --- */
+.view-section { width: 100%; }
+.history-header {
+    padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface); border-bottom: 1px solid var(--border-color);
+}
+.history-header h2 { font-size: 18px; color: var(--text-main); }
+.history-list { padding: 15px 20px 100px 20px; display: flex; flex-direction: column; gap: 12px; }
+
+.history-card {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hc-top { display: flex; justify-content: space-between; align-items: center; }
+.hc-inv { font-weight: 700; font-size: 13px; color: var(--primary); }
+.hc-date { font-size: 11px; color: var(--text-muted); }
+.hc-middle { font-size: 13px; color: var(--text-main); font-weight: 600; border-top: 1px dashed var(--border-color); border-bottom: 1px dashed var(--border-color); padding: 8px 0; }
+.hc-bottom { display: flex; justify-content: space-between; align-items: center; }
+.hc-cust { font-size: 12px; color: var(--text-muted); }
+.hc-total { font-size: 14px; font-weight: 700; color: var(--text-main); }
+
+/* Badge Status Lunas / Belum Lunas */
+.badge {
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+    text-transform: uppercase;
+}
+.badge.lunas { background: #d1fae5; color: #065f46; }
+.badge.belum { background: #fee2e2; color: #991b1b; }

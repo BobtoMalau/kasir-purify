@@ -6,6 +6,7 @@ let cart = [];
 let customers = []; // Variabel untuk menyimpan data pelanggan
 let currentUser = null;
 let activeCategory = 'Kiloan';
+let transactions = []; // <-- TAMBAHKAN INI DI SINI
 
 // Elemen DOM
 const productGrid = document.getElementById('productGrid');
@@ -79,15 +80,17 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 // --- SISTEM KATALOG ---
 function loadCatalogFromCloud() {
     productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Memuat data dari sistem...</p>';
+
     fetch(GOOGLE_SCRIPT_URL)
         .then(res => res.json())
         .then(data => { 
-            // Server sekarang mengirim 2 data: catalog dan customers
             products = data.catalog; 
             customers = data.customers || [];
-            
+            transactions = data.transactions || []; // <-- Tangkap data transaksi
+
             renderProducts(); 
-            populateCustomerList(); // Panggil fungsi pembuat daftar pelanggan
+            populateCustomerList(); 
+            renderHistory(); // <-- Render daftar riwayat
         })
         .catch(() => productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:red; font-size:13px;">Gagal memuat sistem.</p>');
 }
@@ -367,5 +370,74 @@ document.getElementById('paymentStatus').addEventListener('change', (e) => {
     let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
     calculateChange(total);
 });
+// --- LOGIKA PINDAH TAB (KASIR VS RIWAYAT) ---
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        const target = e.currentTarget.getAttribute('data-target');
+
+        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+
+        if (target === 'pos') {
+            document.getElementById('posView').style.display = 'block';
+            document.getElementById('historyView').style.display = 'none';
+        } else if (target === 'history') {
+            document.getElementById('posView').style.display = 'none';
+            document.getElementById('historyView').style.display = 'block';
+            renderHistory();
+        }
+    });
+});
+
+document.getElementById('refreshHistoryBtn').addEventListener('click', () => {
+    loadCatalogFromCloud();
+    alert("Data riwayat diperbarui!");
+});
+
+// --- RENDER HALAMAN RIWAYAT TRANSAKSI ---
+function renderHistory() {
+    const historyList = document.getElementById('historyList');
+    if (!historyList) return;
+
+    historyList.innerHTML = '';
+
+    if (transactions.length === 0) {
+        historyList.innerHTML = `<p style="text-align:center; color:gray; font-size:13px; margin-top:30px;">Belum ada riwayat transaksi.</p>`;
+        return;
+    }
+
+    transactions.forEach(trx => {
+        const card = document.createElement('div');
+        card.classList.add('history-card');
+
+        let formattedDate = trx.date;
+        try {
+            const d = new Date(trx.date);
+            formattedDate = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        } catch(e) {}
+
+        const isLunas = trx.status === 'Lunas';
+
+        card.innerHTML = `
+            <div class="hc-top">
+                <span class="hc-inv">${trx.invoice || 'INV-XXXX'}</span>
+                <span class="hc-date">${formattedDate}</span>
+            </div>
+            <div class="hc-middle">
+                ${trx.items}
+            </div>
+            <div class="hc-bottom">
+                <div>
+                    <span class="hc-cust">👤 ${trx.name || 'Umum'} (${trx.wa || '-'})</span><br>
+                    <span class="badge ${isLunas ? 'lunas' : 'belum'}">${trx.status}</span>
+                </div>
+                <div class="hc-total">
+                    Rp ${Number(trx.total).toLocaleString('id-ID')}
+                </div>
+            </div>
+        `;
+        historyList.appendChild(card);
+    });
+}
 // Pastikan checkSession() tetap ada di baris paling akhir file Anda
 checkSession();

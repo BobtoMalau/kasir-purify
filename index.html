@@ -55,6 +55,27 @@
                 <!-- Produk dirender JS -->
             </div>
         </main>
+        <!-- ... (header dan kategori tetap ada di atasnya) ... -->
+
+<!-- KONTEN HALAMAN KASIR -->
+<div id="posView" class="view-section active">
+    <div class="category-scroll">
+        <button class="tab-btn active" data-category="Kiloan">Kiloan</button>
+        <button class="tab-btn" data-category="Satuan">Satuan</button>
+    </div>
+    <main class="product-area">
+        <div class="product-grid" id="productGrid"></div>
+    </main>
+</div>
+
+<!-- KONTEN HALAMAN RIWAYAT (BARU) -->
+<div id="historyView" class="view-section" style="display: none;">
+    <div class="history-header">
+        <h2>Riwayat Transaksi</h2>
+        <button id="refreshHistoryBtn" class="icon-btn" title="Muat Ulang">🔄</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+</div>
 
         <!-- FLOATING CART (Melayang di Bawah) -->
         <div id="floatingCart" class="floating-cart" style="display: none;">
@@ -147,6 +168,19 @@
 
     </div>
 
-    <script src="script.js"></script>
+   <!-- BILAH NAVIGASI BAWAH -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-target="pos">
+            <span class="nav-icon">🛒</span>
+            <span class="nav-label">Kasir</span>
+        </button>
+        <button class="nav-item" data-target="history">
+            <span class="nav-icon">📋</span>
+            <span class="nav-label">Riwayat</span>
+        </button>
+    </nav>
+</div> <!-- Penutup #mainApp -->
+
+<script src="script.js"></script>
 </body>
 </html>
