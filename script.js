@@ -3,6 +3,7 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8ps
 
 let products = [];
 let cart = [];
+let customers = []; // Variabel untuk menyimpan data pelanggan
 let currentUser = null;
 let activeCategory = 'Kiloan';
 
@@ -77,18 +78,70 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 
 // --- SISTEM KATALOG ---
 function loadCatalogFromCloud() {
-    productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Memuat layanan dari sistem...</p>';
-    fetch(GOOGLE_SCRIPT_URL).then(res => res.json()).then(data => { products = data; renderProducts(); })
-    .catch(() => productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:red; font-size:13px;">Gagal memuat katalog.</p>');
+    productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Memuat data dari sistem...</p>';
+    fetch(GOOGLE_SCRIPT_URL)
+        .then(res => res.json())
+        .then(data => { 
+            // Server sekarang mengirim 2 data: catalog dan customers
+            products = data.catalog; 
+            customers = data.customers || [];
+            
+            renderProducts(); 
+            populateCustomerList(); // Panggil fungsi pembuat daftar pelanggan
+        })
+        .catch(() => productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:red; font-size:13px;">Gagal memuat sistem.</p>');
 }
 
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        activeCategory = e.target.getAttribute('data-category');
-        renderProducts();
+// --- FUNGSI BARU: DAFTAR PELANGGAN & AUTO-FILL BERDASARKAN NAMA ---
+function populateCustomerList() {
+    const customerList = document.getElementById('customerList');
+    if (!customerList) return;
+    customerList.innerHTML = ''; // Kosongkan daftar sebelumnya
+    
+    // Memasukkan Nama pelanggan ke dalam pilihan saran pencarian
+    customers.forEach(cust => {
+        const option = document.createElement('option');
+        option.value = cust.name; // Nilai utama yang diketik adalah Nama
+        option.text = `WA: ${cust.wa}`; // Info tambahan di sebelah pilihan
+        customerList.appendChild(option);
     });
+}
+
+// Fitur Ajaib Dibalik: Saat Nama diketik/dipilih, otomatis isi kolom Nomor WhatsApp!
+document.getElementById('customerName').addEventListener('input', (e) => {
+    const typedName = e.target.value.trim();
+    // Cari data berdasarkan Nama (tidak peduli huruf besar/kecil)
+    const foundCustomer = customers.find(c => c.name.toLowerCase() === typedName.toLowerCase());
+    
+    if (foundCustomer) {
+        // Jika nama ditemukan, otomatis isi nomor WhatsApp dan beri efek sorotan
+        const waInput = document.getElementById('customerWA');
+        waInput.value = foundCustomer.wa;
+        waInput.style.borderColor = 'var(--primary)';
+        waInput.style.backgroundColor = '#e0f2f1';
+        setTimeout(() => {
+            waInput.style.borderColor = 'var(--border-color)';
+            waInput.style.backgroundColor = '#f8fafc';
+        }, 1000);
+    }
+});
+
+// Fitur Ajaib: Saat nomor WA diketik/dipilih, otomatis isi kolom Nama!
+document.getElementById('customerWA').addEventListener('input', (e) => {
+    const typedWA = e.target.value;
+    const foundCustomer = customers.find(c => c.wa === typedWA);
+    
+    if (foundCustomer) {
+        // Jika pelanggan ditemukan, otomatis isi nama dan berikan efek sorotan
+        const nameInput = document.getElementById('customerName');
+        nameInput.value = foundCustomer.name;
+        nameInput.style.borderColor = 'var(--primary)';
+        nameInput.style.backgroundColor = '#e0f2f1';
+        setTimeout(() => {
+            nameInput.style.borderColor = 'var(--border-color)';
+            nameInput.style.backgroundColor = '#f8fafc';
+        }, 1000);
+    }
 });
 
 function renderProducts() {

@@ -78,8 +78,12 @@
                 
                 <div class="payment-section">
                     <h3>Data Pelanggan</h3>
-                    <input type="text" id="customerName" class="input-field" placeholder="Nama Pelanggan (Wajib)">
-                    <input type="number" id="customerWA" class="input-field" placeholder="No. WhatsApp">
+                    <!-- Kolom Nama sekarang di atas, dilengkapi fitur pencarian (datalist) -->
+                    <input type="text" id="customerName" class="input-field" placeholder="Nama Pelanggan (Ketik untuk cari...)" list="customerList" autocomplete="off">
+                    <datalist id="customerList"></datalist>
+                    
+                    <!-- Kolom WA di bawah, yang akan terisi otomatis -->
+                    <input type="tel" id="customerWA" class="input-field" placeholder="No. WhatsApp (Otomatis terisi)">
                     
                     <h3 style="margin-top: 15px;">Pembayaran</h3>
                     <div class="summary-row">
