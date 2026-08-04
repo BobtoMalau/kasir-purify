@@ -292,7 +292,44 @@ function generateInvoiceNumber() {
     return `INV-${yy}${mm}${dd}-${randomNum}`;
 }
 
-// --- SELESAIKAN TRANSAKSI (DIPERBARUI DENGAN INVOICE) ---
+// --- FUNGSI BARU: FORMAT NOMOR & STRUK WHATSAPP ---
+function sendWhatsAppReceipt(invoice, wa, name, cartData, total, status) {
+    // 1. Ubah nomor HP awalan '0' menjadi '62' sesuai standar WhatsApp
+    let formattedWA = wa.replace(/\D/g, ''); // Hapus karakter selain angka
+    if (formattedWA.startsWith('0')) {
+        formattedWA = '62' + formattedWA.substring(1);
+    }
+
+    // 2. Desain teks struk (Gunakan \n untuk baris baru, dan *teks* untuk tebal)
+    let msg = `*PURIFY LAUNDRY*\n`;
+    msg += `--------------------------------------\n`;
+    msg += `*No. Nota:* ${invoice}\n`;
+    msg += `*Pelanggan:* ${name || 'Umum'}\n`;
+    msg += `*Status:* ${status}\n`;
+    msg += `--------------------------------------\n`;
+    msg += `*Rincian Pesanan:*\n`;
+    
+    // Looping semua item di keranjang
+    cartData.forEach(item => {
+        let subtotal = item.price * item.quantity;
+        msg += `- ${item.name} (${item.quantity}x) : Rp ${subtotal.toLocaleString('id-ID')}\n`;
+    });
+    
+    msg += `--------------------------------------\n`;
+    msg += `*TOTAL TAGIHAN: Rp ${total.toLocaleString('id-ID')}*\n`;
+    msg += `--------------------------------------\n`;
+    msg += `Terima kasih telah mempercayakan cucian Anda di tempat kami! 🙏`;
+
+    // 3. Ubah teks menjadi format link dan buka WhatsApp
+    const encodedMsg = encodeURIComponent(msg);
+    const waLink = `https://wa.me/${formattedWA}?text=${encodedMsg}`;
+    
+    // Buka WhatsApp di tab baru atau aplikasi WA di HP
+    window.open(waLink, '_blank');
+}
+
+
+// --- SELESAIKAN TRANSAKSI (DIPERBARUI DENGAN WHATSAPP) ---
 checkoutBtn.addEventListener('click', () => {
     if (cart.length === 0) return;
     
@@ -314,6 +351,10 @@ checkoutBtn.addEventListener('click', () => {
     const invoiceNumber = generateInvoiceNumber();
     let itemDetails = cart.map(item => `${item.name} (${item.quantity}x)`).join(", ");
     
+    // Simpan nilai input pelanggan sebelum keranjang di-reset
+    const custName = document.getElementById('customerName').value;
+    const custWA = document.getElementById('customerWA').value;
+    
     let transactionData = {
         action: "transaction", 
         invoice: invoiceNumber, 
@@ -321,9 +362,9 @@ checkoutBtn.addEventListener('click', () => {
         total: total, 
         cash: cash, 
         change: paymentStatus === 'Lunas' ? (cash - total) : 0,
-        customerName: document.getElementById('customerName').value,
-        customerWA: document.getElementById('customerWA').value,
-        paymentStatus: paymentStatus // DATA STATUS BARU
+        customerName: custName,
+        customerWA: custWA,
+        paymentStatus: paymentStatus 
     };
 
     checkoutBtn.innerText = "Memproses..."; 
@@ -336,12 +377,19 @@ checkoutBtn.addEventListener('click', () => {
         body: JSON.stringify(transactionData) 
     })
     .then(() => {
-        alert(`Transaksi Berhasil disimpan!\nNo. Invoice: ${invoiceNumber}\nStatus: ${paymentStatus}`);
+        // --- FITUR WHATSAPP BERJALAN DI SINI ---
+        if (custWA && custWA.length >= 9) {
+            // Jika ada nomor WA, kirim struk otomatis
+            sendWhatsAppReceipt(invoiceNumber, custWA, custName, cart, total, paymentStatus);
+        } else {
+            // Jika tidak ada nomor WA, hanya tampilkan notifikasi layar biasa
+            alert(`Transaksi Berhasil disimpan!\nNo. Invoice: ${invoiceNumber}\nStatus: ${paymentStatus}\n(Struk tidak dikirim ke WA karena nomor kosong)`);
+        }
         
         // Reset Keranjang & Form
         cart = []; 
         document.getElementById('cashGiven').value = '';
-        document.getElementById('cashGiven.disabled') = false;
+        document.getElementById('cashGiven').disabled = false; // INI SUDAH DIPERBAIKI
         document.getElementById('paymentStatus').value = 'Lunas'; // Reset ke Lunas
         document.getElementById('customerName').value = ''; 
         document.getElementById('customerWA').value = '';
@@ -354,6 +402,7 @@ checkoutBtn.addEventListener('click', () => {
         checkoutBtn.disabled = false; 
     });
 });
+
 // --- ATURAN OTOMATIS STATUS PEMBAYARAN ---
 document.getElementById('paymentStatus').addEventListener('change', (e) => {
     const status = e.target.value;
@@ -370,6 +419,7 @@ document.getElementById('paymentStatus').addEventListener('change', (e) => {
     let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
     calculateChange(total);
 });
+
 // --- LOGIKA PINDAH TAB (KASIR VS RIWAYAT) ---
 document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
