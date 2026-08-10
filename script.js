@@ -397,9 +397,16 @@ function renderHistory() {
             <div class="hc-middle">${trx.items}</div>
             <div class="hc-bottom">
                 <div><span class="hc-cust">👤 ${trx.name || 'Umum'} (${trx.wa || '-'})</span><br><span class="badge ${isLunas ? 'lunas' : 'belum'}">${trx.status}</span></div>
-                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
                     <div class="hc-total">Rp ${Number(trx.total).toLocaleString('id-ID')}</div>
-                    ${hasWA ? `<button class="btn-wa" onclick="resendWA('${trx.invoice}', '${trx.wa}', '${trx.name}', '${trx.items}', ${trx.total}, '${trx.status}')">Kirim Ulang WA</button>` : ''}
+                    
+                    <div style="display: flex; gap: 5px;">
+                        <!-- Tombol Cetak Bluetooth -->
+                        <button class="btn-print" onclick="printThermalReceipt('${trx.invoice}', '${trx.name}', '${trx.items}', ${trx.total}, ${trx.cash || 0}, ${trx.change || 0}, '${trx.status}')" style="background:#0f766e; color:white; border:none; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;">🖨️ Cetak</button>
+                        
+                        <!-- Tombol WA -->
+                        ${hasWA ? `<button class="btn-wa" onclick="resendWA('${trx.invoice}', '${trx.wa}', '${trx.name}', '${trx.items}', ${trx.total}, '${trx.status}')">WA</button>` : ''}
+                    </div>
                 </div>
             </div>`;
         historyList.appendChild(card);
@@ -446,5 +453,101 @@ document.getElementById('saveProductBtn').addEventListener('click', () => {
     products.push(newP); renderProducts(); document.getElementById('addProductModal').style.display = 'none';
     fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "add_product", product: newP }) });
 });
+
+// --- FUNGSI CETAK NOTA KE PRINTER THERMAL BLUETOOTH ---
+window.printThermalReceipt = async function(invoice, name, itemsStr, total, cash, change, status) {
+    try {
+        // 1. Minta browser mencari perangkat Bluetooth (Printer Thermal)
+        // Menggunakan filter umum untuk printer thermal BLE / SPP
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455', '0000ff00-0000-1000-8000-00805f9b34fb']
+        });
+
+        if (!device) {
+            alert("Tidak ada printer yang dipilih.");
+            return;
+        }
+
+        // 2. Hubungkan ke Server GATT Printer
+        const server = await device.gatt.connect();
+        
+        // Cari service utama printer (biasanya menggunakan UUID generik printer thermal)
+        const services = await server.getPrimaryServices();
+        let targetCharacteristic = null;
+
+        for (const service of services) {
+            const characteristics = await service.getCharacteristics();
+            for (const characteristic of characteristics) {
+                if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                    targetCharacteristic = characteristic;
+                    break;
+                }
+            }
+            if (targetCharacteristic) break;
+        }
+
+        if (!targetCharacteristic) {
+            alert("Gagal menemukan jalur data printer. Pastikan printer kompatibel.");
+            return;
+        }
+
+        // 3. Format Teks Nota (Perintah ESC/POS Sederhana)
+        // \x1b\x40 = Initialize, \x1b\x61\x01 = Center, \x1b\x61\x00 = Left, \n = Baris baru
+        let encoder = new TextEncoder();
+        let commands = [];
+
+        commands.push(new Uint8Array([0x1B, 0x40])); // Reset printer
+        
+        // Header (Center)
+        commands.push(encoder.encode("\x1b\x61\x01")); // Center align
+        commands.push(encoder.encode("PURIFY LAUNDRY\n"));
+        commands.push(encoder.encode("--------------------------------\n"));
+        
+        // Info Nota (Left)
+        commands.push(encoder.encode("\x1b\x61\x00")); // Left align
+        commands.push(encoder.encode(`No Nota  : ${invoice}\n`));
+        commands.push(encoder.encode(`Tanggal  : ${new Date().toLocaleString('id-ID')}\n`));
+        commands.push(encoder.encode(`Pelanggan: ${name || 'Umum'}\n`));
+        commands.push(encoder.encode(`Status   : ${status}\n`));
+        commands.push(encoder.encode("--------------------------------\n"));
+        
+        // Rincian Item
+        commands.push(encoder.encode("RINCIAN PESANAN:\n"));
+        let itemsArray = itemsStr.split(', ');
+        itemsArray.forEach(item => {
+            commands.push(encoder.encode(`- ${item}\n`));
+        });
+        
+        commands.push(encoder.encode("--------------------------------\n"));
+        
+        // Total & Pembayaran (Right/Left)
+        commands.push(encoder.encode(`TOTAL    : Rp ${Number(total).toLocaleString('id-ID')}\n`));
+        if (status === 'Lunas') {
+            commands.push(encoder.encode(`Bayar    : Rp ${Number(cash).toLocaleString('id-ID')}\n`));
+            commands.push(encoder.encode(`Kembali  : Rp ${Number(change).toLocaleString('id-ID')}\n`));
+        }
+        commands.push(encoder.encode("--------------------------------\n"));
+        
+        // Footer (Center)
+        commands.push(encoder.encode("\x1b\x61\x01")); // Center align
+        commands.push(encoder.encode("Terima Kasih Atas\nKepercayaan Anda!\n\n\n"));
+        
+        // Perintah potong kertas / feed (jika didukung printer)
+        commands.push(new Uint8Array([0x1D, 0x56, 0x42, 0x00])); 
+
+        // 4. Kirim data byte ke printer secara bertahap
+        for (let cmd of commands) {
+            await targetCharacteristic.writeValue(cmd);
+        }
+
+        alert("Nota berhasil dicetak!");
+        server.disconnect();
+
+    } catch (error) {
+        console.error(error);
+        alert("Pencetakan gagal atau koneksi Bluetooth dibatalkan: " + error.message);
+    }
+};
 
 checkSession();
