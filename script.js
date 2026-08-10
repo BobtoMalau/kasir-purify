@@ -12,18 +12,7 @@ let transactions = [];
 const productGrid = document.getElementById('productGrid');
 const cartItemsContainer = document.getElementById('cartItems');
 const checkoutBtn = document.getElementById('checkoutBtn');
-const addServiceBtn = document.getElementById('addServiceBtn'); // Tombol di header (opsional)
 
-// Elemen Floating Cart & Bottom Sheet
-const floatingCart = document.getElementById('floatingCart');
-const fcItemCount = document.getElementById('fcItemCount');
-const fcTotal = document.getElementById('fcTotal');
-const fcOpenBtn = document.getElementById('fcOpenBtn');
-const checkoutOverlay = document.getElementById('checkoutOverlay');
-const checkoutSheet = document.getElementById('checkoutSheet');
-const closeSheetBtn = document.getElementById('closeSheetBtn');
-
-// Elemen Login & App
 const loginScreen = document.getElementById('loginScreen');
 const mainApp = document.getElementById('mainApp');
 const activeUserLabel = document.getElementById('activeUserLabel');
@@ -38,22 +27,14 @@ function checkSession() {
         
         activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
         
-        // Atur tampilan Dashboard berdasarkan Role
         const userRole = currentUser.role.toLowerCase(); 
         const menuAddService = document.getElementById('menuAddService');
-        if (menuAddService) {
-            menuAddService.style.display = userRole === 'owner' ? 'flex' : 'none';
-        }
+        if (menuAddService) menuAddService.style.display = userRole === 'owner' ? 'flex' : 'none';
         
-        // Sapaan di Dashboard
         const greeting = document.getElementById('welcomeGreeting');
-        if (greeting) {
-            greeting.innerText = `Halo, ${currentUser.username} 👋`;
-        }
+        if (greeting) greeting.innerText = `Halo, ${currentUser.username} 👋`;
 
-        // Tampilkan Dashboard sebagai halaman pertama
         switchView('dashboardView');
-        
         loadCatalogFromCloud();
     } else {
         loginScreen.style.display = 'flex';
@@ -81,7 +62,7 @@ document.getElementById('loginBtn').addEventListener('click', () => {
             document.getElementById('loginUsername').value = ''; document.getElementById('loginPin').value = '';
             checkSession();
         } else msg.innerText = "Username atau PIN salah!";
-    }).catch(() => msg.innerText = "Gagal terhubung. Cek internet!").finally(() => {
+    }).catch(() => msg.innerText = "Gagal terhubung.").finally(() => {
         btn.innerText = "Masuk Aplikasi"; btn.disabled = false;
     });
 });
@@ -90,30 +71,18 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
     if(confirm("Keluar dari aplikasi?")) { localStorage.removeItem('purify_session'); currentUser = null; cart = []; checkSession(); }
 });
 
-// --- SISTEM PERPINDAHAN HALAMAN (DASHBOARD) ---
+// --- SISTEM PERPINDAHAN HALAMAN ---
 window.switchView = function(viewId) {
-    // Sembunyikan semua halaman
     const views = ['dashboardView', 'posView', 'cashOutView', 'historyView'];
     views.forEach(id => {
         const el = document.getElementById(id);
         if(el) el.style.display = 'none';
     });
-
-    // Tampilkan halaman yang dituju
     const targetView = document.getElementById(viewId);
     if(targetView) targetView.style.display = 'block';
 
-    // Render riwayat jika halaman riwayat dibuka
-    if (viewId === 'historyView') {
-        renderHistory();
-    }
-    
-    // Sembunyikan keranjang jika keluar dari POS
-    if (viewId !== 'posView') {
-        floatingCart.style.display = 'none';
-    } else {
-        if(cart.length > 0) floatingCart.style.display = 'flex';
-    }
+    if (viewId === 'historyView') renderHistory();
+    if (viewId === 'posView') renderCart(); // Tampilkan keranjang kosong saat buka kasir
 };
 
 window.openAddProductModal = function() {
@@ -122,19 +91,14 @@ window.openAddProductModal = function() {
     document.getElementById('addProductModal').style.display = 'flex';
 };
 
-// --- SISTEM KATALOG & DATA PELANGGAN ---
+// --- KATALOG & DATA PELANGGAN ---
 function loadCatalogFromCloud() {
     productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Memuat data dari sistem...</p>';
-
     fetch(GOOGLE_SCRIPT_URL)
         .then(res => res.json())
         .then(data => { 
-            products = data.catalog; 
-            customers = data.customers || [];
-            transactions = data.transactions || []; 
-
-            renderProducts(); 
-            populateCustomerList(); 
+            products = data.catalog; customers = data.customers || []; transactions = data.transactions || []; 
+            renderProducts(); populateCustomerList(); 
         })
         .catch(() => productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:red; font-size:13px;">Gagal memuat sistem.</p>');
 }
@@ -145,8 +109,7 @@ function populateCustomerList() {
     customerList.innerHTML = ''; 
     customers.forEach(cust => {
         const option = document.createElement('option');
-        option.value = cust.name; 
-        option.text = `WA: ${cust.wa}`; 
+        option.value = cust.name; option.text = `WA: ${cust.wa}`; 
         customerList.appendChild(option);
     });
 }
@@ -161,12 +124,8 @@ function checkAndFillCustomer(typedName) {
     const waInput = document.getElementById('customerWA');
     if (foundCustomer) {
         waInput.value = foundCustomer.wa;
-        waInput.style.borderColor = 'var(--primary)';
-        waInput.style.backgroundColor = '#e0f2f1';
-        setTimeout(() => {
-            waInput.style.borderColor = 'var(--border-color)';
-            waInput.style.backgroundColor = '#f8fafc';
-        }, 1000);
+        waInput.style.borderColor = 'var(--primary)'; waInput.style.backgroundColor = '#e0f2f1';
+        setTimeout(() => { waInput.style.borderColor = 'var(--border-color)'; waInput.style.backgroundColor = '#f8fafc'; }, 1000);
     }
 }
 
@@ -176,16 +135,11 @@ document.getElementById('customerWA').addEventListener('input', (e) => {
     if (foundCustomer) {
         const nameInput = document.getElementById('customerName');
         nameInput.value = foundCustomer.name;
-        nameInput.style.borderColor = 'var(--primary)';
-        nameInput.style.backgroundColor = '#e0f2f1';
-        setTimeout(() => {
-            nameInput.style.borderColor = 'var(--border-color)';
-            nameInput.style.backgroundColor = '#f8fafc';
-        }, 1000);
+        nameInput.style.borderColor = 'var(--primary)'; nameInput.style.backgroundColor = '#e0f2f1';
+        setTimeout(() => { nameInput.style.borderColor = 'var(--border-color)'; nameInput.style.backgroundColor = '#f8fafc'; }, 1000);
     }
 });
 
-// Kategori Filter
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -199,12 +153,10 @@ function renderProducts() {
     productGrid.innerHTML = '';
     const filteredProducts = products.filter(p => (p.category || 'Kiloan') === activeCategory);
     if(filteredProducts.length === 0) {
-        productGrid.innerHTML = `<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Belum ada layanan di kategori ini.</p>`;
+        productGrid.innerHTML = `<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Belum ada layanan.</p>`;
         return;
     }
-    
     const isOwner = currentUser && currentUser.role.toLowerCase() === 'owner';
-    
     filteredProducts.forEach((product) => {
         const card = document.createElement('div');
         card.classList.add('product-card');
@@ -218,12 +170,6 @@ function renderProducts() {
     });
 }
 
-function addToCart(product) {
-    const existing = cart.find(item => item.id === product.id);
-    if (existing) existing.quantity += 1; else cart.push({ ...product, quantity: 1 });
-    renderCart();
-}
-
 window.deleteProduct = function(id, event) {
     event.stopPropagation(); 
     if(confirm("Hapus layanan ini permanen?")) {
@@ -232,35 +178,36 @@ window.deleteProduct = function(id, event) {
     }
 };
 
-// --- SISTEM KERANJANG & CHECKOUT SHEET ---
+// --- FORMULIR KERANJANG TRANSAKSI ---
+function addToCart(product) {
+    const existing = cart.find(item => item.id === product.id);
+    if (existing) existing.quantity += 1; else cart.push({ ...product, quantity: 1 });
+    renderCart();
+}
+
 function renderCart() {
-    let total = 0; let itemCount = 0;
+    let total = 0;
     cartItemsContainer.innerHTML = '';
 
     if (cart.length === 0) {
-        cartItemsContainer.innerHTML = `<p style="text-align:center; color:gray; font-size:13px; margin:20px 0;">Keranjang kosong</p>`;
-        floatingCart.style.display = 'none'; 
-        closeCheckoutSheet(); 
+        cartItemsContainer.innerHTML = `<p style="text-align:center; color:gray; font-size:13px; margin:15px 0; font-style:italic;">Belum ada layanan yang dipilih. Klik layanan di atas.</p>`;
     } else {
-        if(document.getElementById('posView').style.display !== 'none') {
-            floatingCart.style.display = 'flex'; 
-        }
         cart.forEach((item, index) => {
             let subtotal = item.price * item.quantity;
-            total += subtotal; itemCount += item.quantity;
+            total += subtotal;
             const itemRow = document.createElement('div');
             itemRow.classList.add('cart-item-row');
             itemRow.innerHTML = `
                 <div class="cart-item-info">
-                    <span style="color:var(--text-main); display:block; margin-bottom:4px;">${item.name}</span>
+                    <span style="color:var(--text-main); display:block; margin-bottom:4px; font-weight:600;">${item.name}</span>
                     <div class="cart-item-qty">
                         <input type="number" min="0.1" step="0.1" class="qty-input" data-index="${index}" value="${item.quantity}">
                         <span style="font-size:12px; color:var(--text-muted);">x Rp ${item.price.toLocaleString('id-ID')}</span>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-weight:700; font-size:14px;">Rp ${subtotal.toLocaleString('id-ID')}</span>
-                    <button class="btn-remove" data-index="${index}">✕</button>
+                    <span style="font-weight:700; font-size:14px; color:var(--primary);">Rp ${subtotal.toLocaleString('id-ID')}</span>
+                    <button class="btn-remove" data-index="${index}" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:4px 8px; font-weight:bold; font-size:14px;">✕</button>
                 </div>
             `;
             cartItemsContainer.appendChild(itemRow);
@@ -276,24 +223,9 @@ function renderCart() {
             btn.addEventListener('click', (e) => { cart.splice(e.target.getAttribute('data-index'), 1); renderCart(); });
         });
     }
-
-    fcItemCount.innerText = `${itemCount} Item`;
-    fcTotal.innerText = `Rp ${total.toLocaleString('id-ID')}`;
     document.getElementById('totalPrice').innerText = `Rp ${total.toLocaleString('id-ID')}`;
     calculateChange(total);
 }
-
-function openCheckoutSheet() {
-    checkoutOverlay.classList.add('active');
-    checkoutSheet.classList.add('active');
-}
-function closeCheckoutSheet() {
-    checkoutOverlay.classList.remove('active');
-    checkoutSheet.classList.remove('active');
-}
-fcOpenBtn.addEventListener('click', openCheckoutSheet);
-closeSheetBtn.addEventListener('click', closeCheckoutSheet);
-checkoutOverlay.addEventListener('click', closeCheckoutSheet);
 
 function calculateChange(totalPrice) {
     const cash = parseFloat(document.getElementById('cashGiven').value) || 0;
@@ -304,20 +236,15 @@ function calculateChange(totalPrice) {
 }
 document.getElementById('cashGiven').addEventListener('input', () => { calculateChange(cart.reduce((s, i) => s + (i.price * i.quantity), 0)); });
 
-// Aturan Otomatis Status Pembayaran
 document.getElementById('paymentStatus').addEventListener('change', (e) => {
     const status = e.target.value;
     const cashInput = document.getElementById('cashGiven');
     if (status === 'Belum Lunas') {
-        cashInput.value = '0';
-        cashInput.disabled = true;
-        cashInput.style.background = '#e2e8f0';
+        cashInput.value = '0'; cashInput.disabled = true; cashInput.style.background = '#e2e8f0';
     } else {
-        cashInput.disabled = false;
-        cashInput.style.background = '#f8fafc';
+        cashInput.disabled = false; cashInput.style.background = '#f8fafc';
     }
-    let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
-    calculateChange(total);
+    calculateChange(cart.reduce((s, i) => s + (i.price * i.quantity), 0));
 });
 
 // --- TRANSAKSI & INVOICE ---
@@ -332,34 +259,27 @@ function generateInvoiceNumber() {
 
 function sendWhatsAppReceipt(invoice, wa, name, cartData, total, status) {
     let formattedWA = String(wa).replace(/\D/g, ''); 
-    if (formattedWA.startsWith('0')) {
-        formattedWA = '62' + formattedWA.substring(1);
-    } else if (formattedWA.startsWith('8')) {
-        formattedWA = '62' + formattedWA; 
-    }
+    if (formattedWA.startsWith('0')) formattedWA = '62' + formattedWA.substring(1);
+    else if (formattedWA.startsWith('8')) formattedWA = '62' + formattedWA; 
 
     let msg = `*PURIFY LAUNDRY*\n--------------------------------------\n`;
     msg += `*No. Nota:* ${invoice}\n*Pelanggan:* ${name || 'Umum'}\n*Status:* ${status}\n`;
     msg += `--------------------------------------\n*Rincian Pesanan:*\n`;
-    cartData.forEach(item => {
-        let subtotal = item.price * item.quantity;
-        msg += `- ${item.name} (${item.quantity}x) : Rp ${subtotal.toLocaleString('id-ID')}\n`;
-    });
+    cartData.forEach(item => { msg += `- ${item.name} (${item.quantity}x) : Rp ${(item.price * item.quantity).toLocaleString('id-ID')}\n`; });
     msg += `--------------------------------------\n*TOTAL TAGIHAN: Rp ${total.toLocaleString('id-ID')}*\n--------------------------------------\n`;
     msg += `Terima kasih telah mempercayakan cucian Anda di tempat kami! 🙏`;
-
     window.open(`https://wa.me/${formattedWA}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 checkoutBtn.addEventListener('click', () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0) { alert("Pilih minimal 1 layanan terlebih dahulu!"); return; }
     
     let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
     const paymentStatus = document.getElementById('paymentStatus').value;
     let cash = parseFloat(document.getElementById('cashGiven').value) || 0;
 
     if (paymentStatus === 'Lunas' && cash < total) { alert("Uang pembayaran kurang untuk status Lunas!"); return; }
-    if (paymentStatus === 'Belum Lunas') { cash = 0; }
+    if (paymentStatus === 'Belum Lunas') cash = 0;
 
     const invoiceNumber = generateInvoiceNumber();
     let itemDetails = cart.map(item => `${item.name} (${item.quantity}x)`).join(", ");
@@ -378,16 +298,17 @@ checkoutBtn.addEventListener('click', () => {
         if (custWA && custWA.length >= 9) {
             sendWhatsAppReceipt(invoiceNumber, custWA, custName, cart, total, paymentStatus);
         } else {
-            alert(`Transaksi Berhasil disimpan!\nNo: ${invoiceNumber}\nStatus: ${paymentStatus}`);
+            alert(`Transaksi Berhasil!\nNo: ${invoiceNumber}\nStatus: ${paymentStatus}`);
         }
+        
+        // Reset Formulir dan kembali ke Dashboard
         cart = []; 
-        document.getElementById('cashGiven').value = '';
-        document.getElementById('cashGiven').disabled = false; 
+        document.getElementById('cashGiven').value = ''; document.getElementById('cashGiven').disabled = false; 
         document.getElementById('paymentStatus').value = 'Lunas'; 
-        document.getElementById('customerName').value = ''; 
-        document.getElementById('customerWA').value = '';
-        renderCart(); closeCheckoutSheet();
-        loadCatalogFromCloud(); // Refresh data riwayat
+        document.getElementById('customerName').value = ''; document.getElementById('customerWA').value = '';
+        renderCart(); 
+        loadCatalogFromCloud(); 
+        switchView('dashboardView');
     })
     .catch(() => alert("Koneksi gagal."))
     .finally(() => { checkoutBtn.innerText = "Selesaikan Transaksi"; checkoutBtn.disabled = false; });
@@ -402,7 +323,6 @@ window.resendWA = function(invoice, wa, name, itemsStr, total, status) {
     let formattedWA = String(wa).replace(/\D/g, ''); 
     if (formattedWA.startsWith('0')) formattedWA = '62' + formattedWA.substring(1);
     else if (formattedWA.startsWith('8')) formattedWA = '62' + formattedWA; 
-    
     let formattedItems = itemsStr.split(', ').join('\n- ');
     let msg = `*PURIFY LAUNDRY*\n--------------------------------------\n*No. Nota:* ${invoice}\n*Pelanggan:* ${name || 'Umum'}\n*Status:* ${status}\n--------------------------------------\n*Rincian Pesanan:*\n- ${formattedItems}\n--------------------------------------\n*TOTAL TAGIHAN: Rp ${Number(total).toLocaleString('id-ID')}*\n--------------------------------------\nTerima kasih telah mempercayakan cucian Anda di tempat kami! 🙏`;
     window.open(`https://wa.me/${formattedWA}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -420,13 +340,9 @@ function renderHistory() {
         const card = document.createElement('div');
         card.classList.add('history-card');
         let formattedDate = trx.date;
-        try {
-            const d = new Date(trx.date);
-            formattedDate = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-        } catch(e) {}
+        try { const d = new Date(trx.date); formattedDate = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch(e) {}
         const isLunas = trx.status === 'Lunas';
         const hasWA = trx.wa && String(trx.wa).length > 8;
-
         card.innerHTML = `
             <div class="hc-top"><span class="hc-inv">${trx.invoice || 'INV-XXXX'}</span><span class="hc-date">${formattedDate}</span></div>
             <div class="hc-middle">${trx.items}</div>
@@ -446,26 +362,21 @@ const cashOutModal = document.getElementById('cashOutModal');
 const openCashOutBtn = document.getElementById('openCashOutModal');
 if(openCashOutBtn) {
     openCashOutBtn.addEventListener('click', () => {
-        document.getElementById('coDescription').value = '';
-        document.getElementById('coAmount').value = '';
+        document.getElementById('coDescription').value = ''; document.getElementById('coAmount').value = '';
         cashOutModal.style.display = 'flex';
     });
 }
 const cancelCoBtn = document.getElementById('cancelCoBtn');
-if(cancelCoBtn) {
-    cancelCoBtn.addEventListener('click', () => { cashOutModal.style.display = 'none'; });
-}
+if(cancelCoBtn) cancelCoBtn.addEventListener('click', () => { cashOutModal.style.display = 'none'; });
+
 const saveCoBtn = document.getElementById('saveCoBtn');
 if(saveCoBtn) {
     saveCoBtn.addEventListener('click', () => {
         const description = document.getElementById('coDescription').value.trim();
         const amount = parseFloat(document.getElementById('coAmount').value);
-        if (!description || isNaN(amount) || amount <= 0) { alert("Masukkan keterangan dan nominal yang valid!"); return; }
+        if (!description || isNaN(amount) || amount <= 0) { alert("Masukkan keterangan dan nominal valid!"); return; }
         
-        const coData = {
-            action: "cash_out", date: new Date().toISOString(), description: description,
-            amount: amount, user: currentUser ? currentUser.username : 'Unknown'
-        };
+        const coData = { action: "cash_out", date: new Date().toISOString(), description: description, amount: amount, user: currentUser ? currentUser.username : 'Unknown' };
         
         saveCoBtn.innerText = "Menyimpan..."; saveCoBtn.disabled = true;
         fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(coData) })
@@ -475,7 +386,7 @@ if(saveCoBtn) {
     });
 }
 
-// --- MODAL TAMBAH PRODUK (KHUSUS OWNER) ---
+// --- MODAL TAMBAH PRODUK ---
 document.getElementById('cancelAddBtn').addEventListener('click', () => document.getElementById('addProductModal').style.display = 'none');
 document.getElementById('saveProductBtn').addEventListener('click', () => {
     const name = document.getElementById('newProductName').value.trim();
@@ -487,5 +398,4 @@ document.getElementById('saveProductBtn').addEventListener('click', () => {
     fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "add_product", product: newP }) });
 });
 
-// Panggilan wajib di akhir file
 checkSession();
