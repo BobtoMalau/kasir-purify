@@ -93,14 +93,63 @@ window.openAddProductModal = function() {
 
 // --- KATALOG & DATA PELANGGAN ---
 function loadCatalogFromCloud() {
-    productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Memuat data dari sistem...</p>';
-    fetch(GOOGLE_SCRIPT_URL)
+    const grid = document.getElementById('productGrid');
+    grid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Memuat data dari sistem...</p>';
+    
+    // Trik Cerdas: Tambahkan waktu saat ini ke URL agar HP tidak menggunakan Cache (memori lama)
+    const urlAntiNyangkut = GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime();
+    
+    fetch(urlAntiNyangkut)
         .then(res => res.json())
         .then(data => { 
-            products = data.catalog; customers = data.customers || []; transactions = data.transactions || []; 
-            renderProducts(); populateCustomerList(); 
+            products = data.catalog || []; 
+            customers = data.customers || []; 
+            transactions = data.transactions || []; 
+            
+            renderProducts(); 
+            populateCustomerList(); 
         })
-        .catch(() => productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:red; font-size:13px;">Gagal memuat sistem.</p>');
+        .catch((err) => {
+            grid.innerHTML = `<p style="text-align:center; grid-column:1/-1; color:red; font-size:13px; margin-top:20px;">Gagal memuat. Periksa internet Anda.</p>`;
+        });
+}
+
+function renderProducts() {
+    const grid = document.getElementById('productGrid');
+    grid.innerHTML = '';
+    
+    // Antisipasi huruf besar/kecil (Kiloan = kiloan)
+    const currentCat = activeCategory.toLowerCase();
+    const filteredProducts = products.filter(p => {
+        const pCat = (p.category || 'Kiloan').toLowerCase();
+        return pCat === currentCat;
+    });
+    
+    // Jika benar-benar kosong
+    if(filteredProducts.length === 0) {
+        grid.innerHTML = `<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Belum ada layanan di kategori ini.</p>`;
+        return;
+    }
+    
+    // Keamanan cek role Owner
+    const isOwner = currentUser && currentUser.role && currentUser.role.toLowerCase() === 'owner';
+    
+    filteredProducts.forEach((product) => {
+        const card = document.createElement('div');
+        card.classList.add('product-card');
+        
+        // Kita kunci desainnya dari JavaScript agar anti-berantakan
+        card.style.cssText = "border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; background: #fff; cursor: pointer; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.02);";
+        
+        card.innerHTML = `
+            ${isOwner ? `<button class="delete-product-btn" onclick="deleteProduct(${product.id}, event)" style="position:absolute; top:8px; right:8px; background:#fee2e2; color:#991b1b; border:none; border-radius:4px; padding:2px 6px; font-size:12px; cursor:pointer;">✕</button>` : ''}
+            <h4 style="margin: 0 0 5px 0; font-size: 13px; color: #0f172a; padding-right: 20px;">${product.name}</h4>
+            <p style="margin: 0; font-size: 13px; font-weight: 700; color: #007770;">Rp ${Number(product.price).toLocaleString('id-ID')}</p>
+        `;
+        
+        card.addEventListener('click', () => addToCart(product));
+        grid.appendChild(card);
+    });
 }
 
 function populateCustomerList() {
