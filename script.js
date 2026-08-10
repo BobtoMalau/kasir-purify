@@ -524,6 +524,81 @@ function renderHistory() {
         `;
         historyList.appendChild(card);
     });
+
+    // --- LOGIKA HALAMAN KAS KELUAR ---
+const cashOutModal = document.getElementById('cashOutModal');
+document.getElementById('openCashOutModal').addEventListener('click', () => {
+    document.getElementById('coDescription').value = '';
+    document.getElementById('coAmount').value = '';
+    cashOutModal.style.display = 'flex';
+});
+document.getElementById('cancelCoBtn').addEventListener('click', () => {
+    cashOutModal.style.display = 'none';
+});
+
+document.getElementById('saveCoBtn').addEventListener('click', () => {
+    const description = document.getElementById('coDescription').value.trim();
+    const amount = parseFloat(document.getElementById('coAmount').value);
+    
+    if (!description || isNaN(amount) || amount <= 0) {
+        alert("Masukkan keterangan dan nominal yang valid!");
+        return;
+    }
+
+    const coData = {
+        action: "cash_out",
+        date: new Date().toISOString(),
+        description: description,
+        amount: amount,
+        user: currentUser ? currentUser.username : 'Unknown'
+    };
+
+    const saveBtn = document.getElementById('saveCoBtn');
+    saveBtn.innerText = "Menyimpan...";
+    saveBtn.disabled = true;
+
+    fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(coData)
+    })
+    .then(() => {
+        alert("Kas keluar berhasil dicatat!");
+        cashOutModal.style.display = 'none';
+        loadCatalogFromCloud(); // Refresh data
+    })
+    .catch(() => alert("Gagal menyimpan data."))
+    .finally(() => {
+        saveBtn.innerText = "Simpan Pengeluaran";
+        saveBtn.disabled = false;
+    });
+});
+
+// --- UPDATE NAVIGASI UNTUK 3 MENU ---
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        const target = e.currentTarget.getAttribute('data-target');
+
+        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+
+        // Sembunyikan semua view
+        document.getElementById('posView').style.display = 'none';
+        document.getElementById('historyView').style.display = 'none';
+        document.getElementById('cashOutView').style.display = 'none';
+
+        // Tampilkan view yang dipilih
+        if (target === 'pos') {
+            document.getElementById('posView').style.display = 'block';
+        } else if (target === 'history') {
+            document.getElementById('historyView').style.display = 'block';
+            renderHistory();
+        } else if (target === 'cashOut') {
+            document.getElementById('cashOutView').style.display = 'block';
+        }
+    });
+});
 }
 // Pastikan checkSession() tetap ada di baris paling akhir file Anda
 checkSession();
