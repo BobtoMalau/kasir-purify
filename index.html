@@ -31,6 +31,165 @@
     <!-- APLIKASI UTAMA -->
     <div id="mainApp" style="display: none;">
         
+        <!-- HEADER KECIL UNTUK PROFIL & LOGOUT -->
+        <header class="app-header">
+            <div class="brand-info">
+                <h1>Purify Laundry</h1>
+                <span id="activeUserLabel" class="user-badge">Kasir</span>
+            </div>
+            <div class="header-actions">
+                <button id="logoutBtn" class="icon-btn logout-btn" title="Keluar">⎋</button>
+            </div>
+        </header>
+
+        <!-- 1. HALAMAN UTAMA: DASHBOARD MENU BESAR -->
+        <div id="dashboardView" class="view-section active">
+            <div class="dashboard-container">
+                <div class="dashboard-banner">
+                    <h2 id="welcomeGreeting">Halo, Kasir 👋</h2>
+                    <p>Silakan pilih menu operasional di bawah ini:</p>
+                </div>
+
+                <div class="menu-grid">
+                    <div class="menu-card" onclick="switchView('posView', 'Buka Kasir')">
+                        <div class="menu-icon">🛒</div>
+                        <span class="menu-title">Kasir (POS)</span>
+                    </div>
+                    <div class="menu-card" onclick="switchView('cashOutView', 'Kas Keluar')">
+                        <div class="menu-icon">💸</div>
+                        <span class="menu-title">Kas Keluar</span>
+                    </div>
+                    <div class="menu-card" onclick="switchView('historyView', 'Riwayat Transaksi')">
+                        <div class="menu-icon">📋</div>
+                        <span class="menu-title">Riwayat</span>
+                    </div>
+                    <div class="menu-card" id="menuAddService" onclick="openAddProductModal()" style="display: none;">
+                        <div class="menu-icon">➕</div>
+                        <span class="menu-title">Tambah Layanan</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. HALAMAN KASIR (POS) -->
+        <div id="posView" class="view-section" style="display: none;">
+            <div class="back-header">
+                <button class="back-btn" onclick="switchView('dashboardView', '')">←</button>
+                <h2>Kasir & Penjualan</h2>
+            </div>
+            <div class="category-scroll" style="margin-top: 10px;">
+                <button class="tab-btn active" data-category="Kiloan">Kiloan</button>
+                <button class="tab-btn" data-category="Satuan">Satuan</button>
+            </div>
+            <main class="product-area" style="padding-bottom: 120px;">
+                <div class="product-grid" id="productGrid"></div>
+            </main>
+        </div>
+
+        <!-- 3. HALAMAN KAS KELUAR -->
+        <div id="cashOutView" class="view-section" style="display: none;">
+            <div class="back-header">
+                <button class="back-btn" onclick="switchView('dashboardView', '')">←</button>
+                <h2>Pencatatan Kas Keluar</h2>
+            </div>
+            <div style="padding: 20px;">
+                <button id="openCashOutModal" class="btn-primary" style="margin-bottom: 20px;">+ Catat Pengeluaran Baru</button>
+                <div class="history-list" id="cashOutList"></div>
+            </div>
+        </div>
+
+        <!-- 4. HALAMAN RIWAYAT TRANSAKSI -->
+        <div id="historyView" class="view-section" style="display: none;">
+            <div class="back-header">
+                <button class="back-btn" onclick="switchView('dashboardView', '')">←</button>
+                <h2>Riwayat Transaksi</h2>
+                <button id="refreshHistoryBtn" class="icon-btn" title="Muat Ulang" style="margin-left: auto;">🔄</button>
+            </div>
+            <div class="history-list" id="historyList" style="padding: 20px; padding-bottom: 100px;"></div>
+        </div>
+
+        <!-- FLOATING CART (Hanya muncul saat kasir pilih item) -->
+        <div id="floatingCart" class="floating-cart" style="display: none;">
+            <div class="fc-info">
+                <span id="fcItemCount" class="fc-count">0 Layanan</span>
+                <span id="fcTotal" class="fc-total">Rp 0</span>
+            </div>
+            <button id="fcOpenBtn" class="fc-btn">Lihat Keranjang <span>›</span></button>
+        </div>
+
+        <!-- BOTTOM SHEET CHECKOUT -->
+        <div id="checkoutOverlay" class="checkout-overlay"></div>
+        <div id="checkoutSheet" class="bottom-sheet">
+            <div class="sheet-header">
+                <h2>Detail Pesanan</h2>
+                <button id="closeSheetBtn" class="close-btn">✕</button>
+            </div>
+            <div class="sheet-body">
+                <div class="cart-items" id="cartItems"></div>
+                <div class="payment-section">
+                    <h3>Data Pelanggan</h3>
+                    <input type="text" id="customerName" class="input-field" placeholder="Nama Pelanggan (Ketik untuk cari...)" list="customerList" autocomplete="off">
+                    <datalist id="customerList"></datalist>
+                    <input type="tel" id="customerWA" class="input-field" placeholder="No. WhatsApp (Otomatis terisi)">
+                    
+                    <h3 style="margin-top: 15px;">Pembayaran</h3>
+                    <div class="summary-row" style="margin-bottom: 12px;">
+                        <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Status Pembayaran</span>
+                        <select id="paymentStatus" class="input-field" style="width: 150px; margin-bottom: 0; padding: 8px; font-weight: 600; color: var(--primary);">
+                            <option value="Lunas">Lunas</option>
+                            <option value="Belum Lunas">Belum Lunas (Nanti)</option>
+                        </select>
+                    </div>
+                    <div class="summary-row">
+                        <span>Total Tagihan</span>
+                        <span id="totalPrice" class="highlight-text">Rp 0</span>
+                    </div>
+                    <div class="summary-row input-row">
+                        <span>Tunai / Bayar</span>
+                        <div class="input-prefix">
+                            <span>Rp</span>
+                            <input type="number" id="cashGiven" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="summary-row divider">
+                        <span>Kembalian</span>
+                        <span id="changeAmount">Rp 0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="sheet-footer">
+                <button class="btn-primary" id="checkoutBtn">Selesaikan Transaksi</button>
+            </div>
+        </div>
+
+        <!-- MODAL TAMBAH LAYANAN -->
+        <div id="addProductModal" class="modal-overlay" style="display: none;">
+            <div class="modal-card">
+                <h3>Tambah Layanan</h3>
+                <div class="input-group">
+                    <label>Nama Layanan</label>
+                    <input type="text" id="newProductName" placeholder="Cth: Cuci Jas">
+                </div>
+                <div class="input-group">
+                    <label>Harga (Rp)</label>
+                    <input type="number" id="newProductPrice" placeholder="Cth: 25000">
+                </div>
+                <div class="input-group">
+                    <label>Kategori</label>
+                    <select id="newProductCategory">
+                        <option value="Kiloan">Cuci Kiloan</option>
+                        <option value="Satuan">Cuci Satuan</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button id="cancelAddBtn" class="btn-text">Batal</button>
+                    <button id="saveProductBtn" class="btn-primary-small">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+        
         <!-- Header (Bilah Atas) -->
         <header class="app-header">
             <div class="brand-info">

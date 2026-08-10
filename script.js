@@ -3,16 +3,16 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8ps
 
 let products = [];
 let cart = [];
-let customers = []; // Variabel untuk menyimpan data pelanggan
+let customers = [];
 let currentUser = null;
 let activeCategory = 'Kiloan';
-let transactions = []; // <-- TAMBAHKAN INI DI SINI
+let transactions = [];
 
 // Elemen DOM
 const productGrid = document.getElementById('productGrid');
 const cartItemsContainer = document.getElementById('cartItems');
 const checkoutBtn = document.getElementById('checkoutBtn');
-const addServiceBtn = document.getElementById('addServiceBtn');
+const addServiceBtn = document.getElementById('addServiceBtn'); // Tombol di header (opsional)
 
 // Elemen Floating Cart & Bottom Sheet
 const floatingCart = document.getElementById('floatingCart');
@@ -23,23 +23,36 @@ const checkoutOverlay = document.getElementById('checkoutOverlay');
 const checkoutSheet = document.getElementById('checkoutSheet');
 const closeSheetBtn = document.getElementById('closeSheetBtn');
 
-// Elemen Login
+// Elemen Login & App
 const loginScreen = document.getElementById('loginScreen');
 const mainApp = document.getElementById('mainApp');
 const activeUserLabel = document.getElementById('activeUserLabel');
 
-// --- SISTEM LOGIN ---
+// --- SISTEM LOGIN & SESI ---
 function checkSession() {
     const savedUser = localStorage.getItem('purify_session');
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
         loginScreen.style.display = 'none';
         mainApp.style.display = 'block';
+        
         activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
         
-        // PERBAIKAN: Mengubah text role menjadi huruf kecil semua agar tidak error
+        // Atur tampilan Dashboard berdasarkan Role
         const userRole = currentUser.role.toLowerCase(); 
-        addServiceBtn.style.display = userRole === 'owner' ? 'block' : 'none';
+        const menuAddService = document.getElementById('menuAddService');
+        if (menuAddService) {
+            menuAddService.style.display = userRole === 'owner' ? 'flex' : 'none';
+        }
+        
+        // Sapaan di Dashboard
+        const greeting = document.getElementById('welcomeGreeting');
+        if (greeting) {
+            greeting.innerText = `Halo, ${currentUser.username} 👋`;
+        }
+
+        // Tampilkan Dashboard sebagai halaman pertama
+        switchView('dashboardView');
         
         loadCatalogFromCloud();
     } else {
@@ -77,7 +90,39 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
     if(confirm("Keluar dari aplikasi?")) { localStorage.removeItem('purify_session'); currentUser = null; cart = []; checkSession(); }
 });
 
-// --- SISTEM KATALOG ---
+// --- SISTEM PERPINDAHAN HALAMAN (DASHBOARD) ---
+window.switchView = function(viewId) {
+    // Sembunyikan semua halaman
+    const views = ['dashboardView', 'posView', 'cashOutView', 'historyView'];
+    views.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.style.display = 'none';
+    });
+
+    // Tampilkan halaman yang dituju
+    const targetView = document.getElementById(viewId);
+    if(targetView) targetView.style.display = 'block';
+
+    // Render riwayat jika halaman riwayat dibuka
+    if (viewId === 'historyView') {
+        renderHistory();
+    }
+    
+    // Sembunyikan keranjang jika keluar dari POS
+    if (viewId !== 'posView') {
+        floatingCart.style.display = 'none';
+    } else {
+        if(cart.length > 0) floatingCart.style.display = 'flex';
+    }
+};
+
+window.openAddProductModal = function() {
+    document.getElementById('newProductName').value = ''; 
+    document.getElementById('newProductPrice').value = '';
+    document.getElementById('addProductModal').style.display = 'flex';
+};
+
+// --- SISTEM KATALOG & DATA PELANGGAN ---
 function loadCatalogFromCloud() {
     productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:gray; font-size:13px; margin-top:20px;">Memuat data dari sistem...</p>';
 
@@ -86,46 +131,33 @@ function loadCatalogFromCloud() {
         .then(data => { 
             products = data.catalog; 
             customers = data.customers || [];
-            transactions = data.transactions || []; // <-- Tangkap data transaksi
+            transactions = data.transactions || []; 
 
             renderProducts(); 
             populateCustomerList(); 
-            renderHistory(); // <-- Render daftar riwayat
         })
         .catch(() => productGrid.innerHTML = '<p style="text-align:center; grid-column:1/-1; color:red; font-size:13px;">Gagal memuat sistem.</p>');
 }
 
-// --- FUNGSI BARU: DAFTAR PELANGGAN & AUTO-FILL BERDASARKAN NAMA ---
 function populateCustomerList() {
     const customerList = document.getElementById('customerList');
     if (!customerList) return;
-    customerList.innerHTML = ''; // Kosongkan daftar sebelumnya
-    
-    // Memasukkan Nama pelanggan ke dalam pilihan saran pencarian
+    customerList.innerHTML = ''; 
     customers.forEach(cust => {
         const option = document.createElement('option');
-        option.value = cust.name; // Nilai utama yang diketik adalah Nama
-        option.text = `WA: ${cust.wa}`; // Info tambahan di sebelah pilihan
+        option.value = cust.name; 
+        option.text = `WA: ${cust.wa}`; 
         customerList.appendChild(option);
     });
 }
 
-// --- PENCARIAN PELANGGAN YANG LEBIH KUAT ---
-document.getElementById('customerName').addEventListener('input', (e) => {
-    checkAndFillCustomer(e.target.value);
-});
-
-document.getElementById('customerName').addEventListener('change', (e) => {
-    checkAndFillCustomer(e.target.value);
-});
+document.getElementById('customerName').addEventListener('input', (e) => { checkAndFillCustomer(e.target.value); });
+document.getElementById('customerName').addEventListener('change', (e) => { checkAndFillCustomer(e.target.value); });
 
 function checkAndFillCustomer(typedName) {
     typedName = typedName.trim().toLowerCase();
     if (!typedName) return;
-
-    // Cari pelanggan yang namanya cocok (mengabaikan huruf besar/kecil)
     const foundCustomer = customers.find(c => c.name && c.name.toLowerCase() === typedName);
-    
     const waInput = document.getElementById('customerWA');
     if (foundCustomer) {
         waInput.value = foundCustomer.wa;
@@ -137,13 +169,11 @@ function checkAndFillCustomer(typedName) {
         }, 1000);
     }
 }
-// Fitur Ajaib: Saat nomor WA diketik/dipilih, otomatis isi kolom Nama!
+
 document.getElementById('customerWA').addEventListener('input', (e) => {
     const typedWA = e.target.value;
     const foundCustomer = customers.find(c => c.wa === typedWA);
-    
     if (foundCustomer) {
-        // Jika pelanggan ditemukan, otomatis isi nama dan berikan efek sorotan
         const nameInput = document.getElementById('customerName');
         nameInput.value = foundCustomer.name;
         nameInput.style.borderColor = 'var(--primary)';
@@ -155,6 +185,16 @@ document.getElementById('customerWA').addEventListener('input', (e) => {
     }
 });
 
+// Kategori Filter
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        activeCategory = e.target.getAttribute('data-category');
+        renderProducts();
+    });
+});
+
 function renderProducts() {
     productGrid.innerHTML = '';
     const filteredProducts = products.filter(p => (p.category || 'Kiloan') === activeCategory);
@@ -163,7 +203,6 @@ function renderProducts() {
         return;
     }
     
-    // PERBAIKAN: Mengecek role dengan mengabaikan huruf besar/kecil
     const isOwner = currentUser && currentUser.role.toLowerCase() === 'owner';
     
     filteredProducts.forEach((product) => {
@@ -185,18 +224,17 @@ function addToCart(product) {
     renderCart();
 }
 
-function deleteProduct(id, event) {
+window.deleteProduct = function(id, event) {
     event.stopPropagation(); 
     if(confirm("Hapus layanan ini permanen?")) {
         products = products.filter(p => p.id !== id); renderProducts();
         fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "delete_product", productId: id }) });
     }
-}
+};
 
 // --- SISTEM KERANJANG & CHECKOUT SHEET ---
 function renderCart() {
-    let total = 0;
-    let itemCount = 0;
+    let total = 0; let itemCount = 0;
     cartItemsContainer.innerHTML = '';
 
     if (cart.length === 0) {
@@ -204,7 +242,9 @@ function renderCart() {
         floatingCart.style.display = 'none'; 
         closeCheckoutSheet(); 
     } else {
-        floatingCart.style.display = 'flex'; 
+        if(document.getElementById('posView').style.display !== 'none') {
+            floatingCart.style.display = 'flex'; 
+        }
         cart.forEach((item, index) => {
             let subtotal = item.price * item.quantity;
             total += subtotal; itemCount += item.quantity;
@@ -264,71 +304,53 @@ function calculateChange(totalPrice) {
 }
 document.getElementById('cashGiven').addEventListener('input', () => { calculateChange(cart.reduce((s, i) => s + (i.price * i.quantity), 0)); });
 
-// --- MODAL TAMBAH LAYANAN ---
-const addProductModal = document.getElementById('addProductModal');
-addServiceBtn.addEventListener('click', () => {
-    document.getElementById('newProductName').value = ''; document.getElementById('newProductPrice').value = '';
-    addProductModal.style.display = 'flex';
-});
-document.getElementById('cancelAddBtn').addEventListener('click', () => addProductModal.style.display = 'none');
-
-document.getElementById('saveProductBtn').addEventListener('click', () => {
-    const name = document.getElementById('newProductName').value.trim();
-    const price = parseInt(document.getElementById('newProductPrice').value);
-    const category = document.getElementById('newProductCategory').value;
-    if (!name || isNaN(price) || price <= 0) { alert("Isi data dengan benar!"); return; }
-    const newP = { id: Date.now(), name, price, category };
-    products.push(newP); renderProducts(); addProductModal.style.display = 'none';
-    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "add_product", product: newP }) });
+// Aturan Otomatis Status Pembayaran
+document.getElementById('paymentStatus').addEventListener('change', (e) => {
+    const status = e.target.value;
+    const cashInput = document.getElementById('cashGiven');
+    if (status === 'Belum Lunas') {
+        cashInput.value = '0';
+        cashInput.disabled = true;
+        cashInput.style.background = '#e2e8f0';
+    } else {
+        cashInput.disabled = false;
+        cashInput.style.background = '#f8fafc';
+    }
+    let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+    calculateChange(total);
 });
 
-// --- MESIN PEMBUAT NOMOR INVOICE OTOMATIS ---
+// --- TRANSAKSI & INVOICE ---
 function generateInvoiceNumber() {
     const date = new Date();
-    const yy = String(date.getFullYear()).slice(-2); // Ambil 2 digit tahun
-    const mm = String(date.getMonth() + 1).padStart(2, '0'); // Bulan
-    const dd = String(date.getDate()).padStart(2, '0'); // Tanggal
-    const randomNum = Math.floor(1000 + Math.random() * 9000); // 4 digit angka acak
+    const yy = String(date.getFullYear()).slice(-2); 
+    const mm = String(date.getMonth() + 1).padStart(2, '0'); 
+    const dd = String(date.getDate()).padStart(2, '0'); 
+    const randomNum = Math.floor(1000 + Math.random() * 9000); 
     return `INV-${yy}${mm}${dd}-${randomNum}`;
 }
 
-// --- FUNGSI BARU: FORMAT NOMOR & STRUK WHATSAPP ---
 function sendWhatsAppReceipt(invoice, wa, name, cartData, total, status) {
-    let formattedWA = String(wa).replace(/\D/g, ''); // Hapus karakter selain angka
-    
-    // LOGIKA BARU: Antisipasi angka 0 yang hilang dari Google Sheets
+    let formattedWA = String(wa).replace(/\D/g, ''); 
     if (formattedWA.startsWith('0')) {
         formattedWA = '62' + formattedWA.substring(1);
     } else if (formattedWA.startsWith('8')) {
-        formattedWA = '62' + formattedWA; // Jika mulai dari 8, langsung tambah 62
+        formattedWA = '62' + formattedWA; 
     }
 
-    let msg = `*PURIFY LAUNDRY*\n`;
-    msg += `--------------------------------------\n`;
-    msg += `*No. Nota:* ${invoice}\n`;
-    msg += `*Pelanggan:* ${name || 'Umum'}\n`;
-    msg += `*Status:* ${status}\n`;
-    msg += `--------------------------------------\n`;
-    msg += `*Rincian Pesanan:*\n`;
-    
+    let msg = `*PURIFY LAUNDRY*\n--------------------------------------\n`;
+    msg += `*No. Nota:* ${invoice}\n*Pelanggan:* ${name || 'Umum'}\n*Status:* ${status}\n`;
+    msg += `--------------------------------------\n*Rincian Pesanan:*\n`;
     cartData.forEach(item => {
         let subtotal = item.price * item.quantity;
         msg += `- ${item.name} (${item.quantity}x) : Rp ${subtotal.toLocaleString('id-ID')}\n`;
     });
-    
-    msg += `--------------------------------------\n`;
-    msg += `*TOTAL TAGIHAN: Rp ${total.toLocaleString('id-ID')}*\n`;
-    msg += `--------------------------------------\n`;
+    msg += `--------------------------------------\n*TOTAL TAGIHAN: Rp ${total.toLocaleString('id-ID')}*\n--------------------------------------\n`;
     msg += `Terima kasih telah mempercayakan cucian Anda di tempat kami! 🙏`;
 
-    const encodedMsg = encodeURIComponent(msg);
-    const waLink = `https://wa.me/${formattedWA}?text=${encodedMsg}`;
-    
-    window.open(waLink, '_blank');
+    window.open(`https://wa.me/${formattedWA}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
-
-// --- SELESAIKAN TRANSAKSI (DIPERBARUI DENGAN WHATSAPP) ---
 checkoutBtn.addEventListener('click', () => {
     if (cart.length === 0) return;
     
@@ -336,269 +358,134 @@ checkoutBtn.addEventListener('click', () => {
     const paymentStatus = document.getElementById('paymentStatus').value;
     let cash = parseFloat(document.getElementById('cashGiven').value) || 0;
 
-    // Validasi: Jika Lunas, uang tunai tidak boleh kurang dari total
-    if (paymentStatus === 'Lunas' && cash < total) { 
-        alert("Uang pembayaran kurang untuk status Lunas!"); 
-        return; 
-    }
-
-    // Jika Belum Lunas, uang tunai diset 0
-    if (paymentStatus === 'Belum Lunas') {
-        cash = 0;
-    }
+    if (paymentStatus === 'Lunas' && cash < total) { alert("Uang pembayaran kurang untuk status Lunas!"); return; }
+    if (paymentStatus === 'Belum Lunas') { cash = 0; }
 
     const invoiceNumber = generateInvoiceNumber();
     let itemDetails = cart.map(item => `${item.name} (${item.quantity}x)`).join(", ");
-    
-    // Simpan nilai input pelanggan sebelum keranjang di-reset
     const custName = document.getElementById('customerName').value;
     const custWA = document.getElementById('customerWA').value;
     
     let transactionData = {
-        action: "transaction", 
-        invoice: invoiceNumber, 
-        items: itemDetails, 
-        total: total, 
-        cash: cash, 
-        change: paymentStatus === 'Lunas' ? (cash - total) : 0,
-        customerName: custName,
-        customerWA: custWA,
-        paymentStatus: paymentStatus 
+        action: "transaction", invoice: invoiceNumber, items: itemDetails, total: total, cash: cash, 
+        change: paymentStatus === 'Lunas' ? (cash - total) : 0, customerName: custName, customerWA: custWA, paymentStatus: paymentStatus 
     };
 
-    checkoutBtn.innerText = "Memproses..."; 
-    checkoutBtn.disabled = true;
+    checkoutBtn.innerText = "Memproses..."; checkoutBtn.disabled = true;
     
-    fetch(GOOGLE_SCRIPT_URL, { 
-        method: 'POST', 
-        mode: 'no-cors', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(transactionData) 
-    })
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transactionData) })
     .then(() => {
-        // --- FITUR WHATSAPP BERJALAN DI SINI ---
         if (custWA && custWA.length >= 9) {
-            // Jika ada nomor WA, kirim struk otomatis
             sendWhatsAppReceipt(invoiceNumber, custWA, custName, cart, total, paymentStatus);
         } else {
-            // Jika tidak ada nomor WA, hanya tampilkan notifikasi layar biasa
-            alert(`Transaksi Berhasil disimpan!\nNo. Invoice: ${invoiceNumber}\nStatus: ${paymentStatus}\n(Struk tidak dikirim ke WA karena nomor kosong)`);
+            alert(`Transaksi Berhasil disimpan!\nNo: ${invoiceNumber}\nStatus: ${paymentStatus}`);
         }
-        
-        // Reset Keranjang & Form
         cart = []; 
         document.getElementById('cashGiven').value = '';
-        document.getElementById('cashGiven').disabled = false; // INI SUDAH DIPERBAIKI
-        document.getElementById('paymentStatus').value = 'Lunas'; // Reset ke Lunas
+        document.getElementById('cashGiven').disabled = false; 
+        document.getElementById('paymentStatus').value = 'Lunas'; 
         document.getElementById('customerName').value = ''; 
         document.getElementById('customerWA').value = '';
-        renderCart(); 
-        closeCheckoutSheet();
+        renderCart(); closeCheckoutSheet();
+        loadCatalogFromCloud(); // Refresh data riwayat
     })
-    .catch(() => alert("Koneksi gagal. Periksa internet Anda."))
-    .finally(() => { 
-        checkoutBtn.innerText = "Selesaikan Transaksi"; 
-        checkoutBtn.disabled = false; 
-    });
+    .catch(() => alert("Koneksi gagal."))
+    .finally(() => { checkoutBtn.innerText = "Selesaikan Transaksi"; checkoutBtn.disabled = false; });
 });
 
-// --- ATURAN OTOMATIS STATUS PEMBAYARAN ---
-document.getElementById('paymentStatus').addEventListener('change', (e) => {
-    const status = e.target.value;
-    const cashInput = document.getElementById('cashGiven');
-    
-    if (status === 'Belum Lunas') {
-        cashInput.value = '0';
-        cashInput.disabled = true; // Kunci input uang karena bayar nanti
-        cashInput.style.background = '#e2e8f0';
-    } else {
-        cashInput.disabled = false; // Buka kembali jika Lunas
-        cashInput.style.background = '#f8fafc';
-    }
-    let total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
-    calculateChange(total);
-});
-
-// --- LOGIKA PINDAH TAB (KASIR VS RIWAYAT) ---
-document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-        const target = e.currentTarget.getAttribute('data-target');
-
-        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-        e.currentTarget.classList.add('active');
-
-        if (target === 'pos') {
-            document.getElementById('posView').style.display = 'block';
-            document.getElementById('historyView').style.display = 'none';
-        } else if (target === 'history') {
-            document.getElementById('posView').style.display = 'none';
-            document.getElementById('historyView').style.display = 'block';
-            renderHistory();
-        }
-    });
-});
-
+// --- RIWAYAT TRANSAKSI ---
 document.getElementById('refreshHistoryBtn').addEventListener('click', () => {
-    loadCatalogFromCloud();
-    alert("Data riwayat diperbarui!");
+    loadCatalogFromCloud(); alert("Data riwayat diperbarui!");
 });
 
-
-// --- FUNGSI KLIK TOMBOL WA DARI RIWAYAT ---
 window.resendWA = function(invoice, wa, name, itemsStr, total, status) {
     let formattedWA = String(wa).replace(/\D/g, ''); 
-    
-    // LOGIKA BARU: Antisipasi angka 0 yang hilang dari Google Sheets
-    if (formattedWA.startsWith('0')) {
-        formattedWA = '62' + formattedWA.substring(1);
-    } else if (formattedWA.startsWith('8')) {
-        formattedWA = '62' + formattedWA; 
-    }
+    if (formattedWA.startsWith('0')) formattedWA = '62' + formattedWA.substring(1);
+    else if (formattedWA.startsWith('8')) formattedWA = '62' + formattedWA; 
     
     let formattedItems = itemsStr.split(', ').join('\n- ');
-    
-    let msg = `*PURIFY LAUNDRY*\n`;
-    msg += `--------------------------------------\n`;
-    msg += `*No. Nota:* ${invoice}\n`;
-    msg += `*Pelanggan:* ${name || 'Umum'}\n`;
-    msg += `*Status:* ${status}\n`;
-    msg += `--------------------------------------\n`;
-    msg += `*Rincian Pesanan:*\n`;
-    msg += `- ${formattedItems}\n`;
-    msg += `--------------------------------------\n`;
-    msg += `*TOTAL TAGIHAN: Rp ${Number(total).toLocaleString('id-ID')}*\n`;
-    msg += `--------------------------------------\n`;
-    msg += `Terima kasih telah mempercayakan cucian Anda di tempat kami! 🙏`;
-
+    let msg = `*PURIFY LAUNDRY*\n--------------------------------------\n*No. Nota:* ${invoice}\n*Pelanggan:* ${name || 'Umum'}\n*Status:* ${status}\n--------------------------------------\n*Rincian Pesanan:*\n- ${formattedItems}\n--------------------------------------\n*TOTAL TAGIHAN: Rp ${Number(total).toLocaleString('id-ID')}*\n--------------------------------------\nTerima kasih telah mempercayakan cucian Anda di tempat kami! 🙏`;
     window.open(`https://wa.me/${formattedWA}?text=${encodeURIComponent(msg)}`, '_blank');
 };
 
-
-// --- RENDER HALAMAN RIWAYAT TRANSAKSI ---
 function renderHistory() {
     const historyList = document.getElementById('historyList');
     if (!historyList) return;
-
     historyList.innerHTML = '';
-
     if (transactions.length === 0) {
         historyList.innerHTML = `<p style="text-align:center; color:gray; font-size:13px; margin-top:30px;">Belum ada riwayat transaksi.</p>`;
         return;
     }
-
     transactions.forEach(trx => {
         const card = document.createElement('div');
         card.classList.add('history-card');
-
         let formattedDate = trx.date;
         try {
             const d = new Date(trx.date);
             formattedDate = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
         } catch(e) {}
-
         const isLunas = trx.status === 'Lunas';
-        
-        // Pengecekan apakah nomor WA ada dan valid
         const hasWA = trx.wa && String(trx.wa).length > 8;
 
         card.innerHTML = `
-            <div class="hc-top">
-                <span class="hc-inv">${trx.invoice || 'INV-XXXX'}</span>
-                <span class="hc-date">${formattedDate}</span>
-            </div>
-            <div class="hc-middle">
-                ${trx.items}
-            </div>
+            <div class="hc-top"><span class="hc-inv">${trx.invoice || 'INV-XXXX'}</span><span class="hc-date">${formattedDate}</span></div>
+            <div class="hc-middle">${trx.items}</div>
             <div class="hc-bottom">
-                <div>
-                    <span class="hc-cust">👤 ${trx.name || 'Umum'} (${trx.wa || '-'})</span><br>
-                    <span class="badge ${isLunas ? 'lunas' : 'belum'}">${trx.status}</span>
-                </div>
+                <div><span class="hc-cust">👤 ${trx.name || 'Umum'} (${trx.wa || '-'})</span><br><span class="badge ${isLunas ? 'lunas' : 'belum'}">${trx.status}</span></div>
                 <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
                     <div class="hc-total">Rp ${Number(trx.total).toLocaleString('id-ID')}</div>
-                    
-                    <!-- KODE TOMBOL WA BARU -->
                     ${hasWA ? `<button class="btn-wa" onclick="resendWA('${trx.invoice}', '${trx.wa}', '${trx.name}', '${trx.items}', ${trx.total}, '${trx.status}')">Kirim Ulang WA</button>` : ''}
                 </div>
-            </div>
-        `;
+            </div>`;
         historyList.appendChild(card);
     });
-
-    // --- LOGIKA HALAMAN KAS KELUAR ---
-const cashOutModal = document.getElementById('cashOutModal');
-document.getElementById('openCashOutModal').addEventListener('click', () => {
-    document.getElementById('coDescription').value = '';
-    document.getElementById('coAmount').value = '';
-    cashOutModal.style.display = 'flex';
-});
-document.getElementById('cancelCoBtn').addEventListener('click', () => {
-    cashOutModal.style.display = 'none';
-});
-
-document.getElementById('saveCoBtn').addEventListener('click', () => {
-    const description = document.getElementById('coDescription').value.trim();
-    const amount = parseFloat(document.getElementById('coAmount').value);
-    
-    if (!description || isNaN(amount) || amount <= 0) {
-        alert("Masukkan keterangan dan nominal yang valid!");
-        return;
-    }
-
-    const coData = {
-        action: "cash_out",
-        date: new Date().toISOString(),
-        description: description,
-        amount: amount,
-        user: currentUser ? currentUser.username : 'Unknown'
-    };
-
-    const saveBtn = document.getElementById('saveCoBtn');
-    saveBtn.innerText = "Menyimpan...";
-    saveBtn.disabled = true;
-
-    fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(coData)
-    })
-    .then(() => {
-        alert("Kas keluar berhasil dicatat!");
-        cashOutModal.style.display = 'none';
-        loadCatalogFromCloud(); // Refresh data
-    })
-    .catch(() => alert("Gagal menyimpan data."))
-    .finally(() => {
-        saveBtn.innerText = "Simpan Pengeluaran";
-        saveBtn.disabled = false;
-    });
-});
-
-// --- UPDATE NAVIGASI UNTUK 3 MENU ---
-document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-        const target = e.currentTarget.getAttribute('data-target');
-
-        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-        e.currentTarget.classList.add('active');
-
-        // Sembunyikan semua view
-        document.getElementById('posView').style.display = 'none';
-        document.getElementById('historyView').style.display = 'none';
-        document.getElementById('cashOutView').style.display = 'none';
-
-        // Tampilkan view yang dipilih
-        if (target === 'pos') {
-            document.getElementById('posView').style.display = 'block';
-        } else if (target === 'history') {
-            document.getElementById('historyView').style.display = 'block';
-            renderHistory();
-        } else if (target === 'cashOut') {
-            document.getElementById('cashOutView').style.display = 'block';
-        }
-    });
-});
 }
-// Pastikan checkSession() tetap ada di baris paling akhir file Anda
+
+// --- PENCATATAN KAS KELUAR ---
+const cashOutModal = document.getElementById('cashOutModal');
+const openCashOutBtn = document.getElementById('openCashOutModal');
+if(openCashOutBtn) {
+    openCashOutBtn.addEventListener('click', () => {
+        document.getElementById('coDescription').value = '';
+        document.getElementById('coAmount').value = '';
+        cashOutModal.style.display = 'flex';
+    });
+}
+const cancelCoBtn = document.getElementById('cancelCoBtn');
+if(cancelCoBtn) {
+    cancelCoBtn.addEventListener('click', () => { cashOutModal.style.display = 'none'; });
+}
+const saveCoBtn = document.getElementById('saveCoBtn');
+if(saveCoBtn) {
+    saveCoBtn.addEventListener('click', () => {
+        const description = document.getElementById('coDescription').value.trim();
+        const amount = parseFloat(document.getElementById('coAmount').value);
+        if (!description || isNaN(amount) || amount <= 0) { alert("Masukkan keterangan dan nominal yang valid!"); return; }
+        
+        const coData = {
+            action: "cash_out", date: new Date().toISOString(), description: description,
+            amount: amount, user: currentUser ? currentUser.username : 'Unknown'
+        };
+        
+        saveCoBtn.innerText = "Menyimpan..."; saveCoBtn.disabled = true;
+        fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(coData) })
+        .then(() => { alert("Kas keluar berhasil dicatat!"); cashOutModal.style.display = 'none'; })
+        .catch(() => alert("Gagal menyimpan data."))
+        .finally(() => { saveCoBtn.innerText = "Simpan Pengeluaran"; saveCoBtn.disabled = false; });
+    });
+}
+
+// --- MODAL TAMBAH PRODUK (KHUSUS OWNER) ---
+document.getElementById('cancelAddBtn').addEventListener('click', () => document.getElementById('addProductModal').style.display = 'none');
+document.getElementById('saveProductBtn').addEventListener('click', () => {
+    const name = document.getElementById('newProductName').value.trim();
+    const price = parseInt(document.getElementById('newProductPrice').value);
+    const category = document.getElementById('newProductCategory').value;
+    if (!name || isNaN(price) || price <= 0) { alert("Isi data dengan benar!"); return; }
+    const newP = { id: Date.now(), name, price, category };
+    products.push(newP); renderProducts(); document.getElementById('addProductModal').style.display = 'none';
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "add_product", product: newP }) });
+});
+
+// Panggilan wajib di akhir file
 checkSession();
