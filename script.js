@@ -1,6 +1,6 @@
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8psGmq7vb3e2nDMOi9FP69REPjPscNbbvnNpl8rjQbEt1MYYrmQ-fhLhz/exec';
 
-let cashOuts = [], products = [], cart = [], customers = [], transactions = [], usersData = [], currentUser = null, activeCategory = 'Kiloan', saldoAwal = 0;
+let cashOuts = [],attendances = [], products = [], cart = [], customers = [], transactions = [], usersData = [], currentUser = null, activeCategory = 'Kiloan', saldoAwal = 0;
 
 const productGrid = document.getElementById('productGrid'), cartItemsContainer = document.getElementById('cartItems'), checkoutBtn = document.getElementById('checkoutBtn'), loginScreen = document.getElementById('loginScreen'), mainApp = document.getElementById('mainApp'), activeUserLabel = document.getElementById('activeUserLabel');
 
@@ -117,7 +117,7 @@ window.deleteUser = function(username) {
 
 // --- NAVIGASI VIEW ---
 window.switchView = function(viewId) {
-    ['dashboardView', 'posView', 'cashOutView', 'historyView', 'settingsView', 'financeView'].forEach(id => {
+    ['dashboardView', 'posView', 'cashOutView', 'historyView', 'settingsView', 'financeView', 'attendanceView'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = (id === viewId) ? 'block' : 'none';
     });
@@ -126,14 +126,21 @@ window.switchView = function(viewId) {
     if (viewId === 'cashOutView') renderCashOutList();
     if (viewId === 'settingsView') renderUsers();
     if (viewId === 'financeView') renderFinanceDetail();
+    if (viewId === 'attendanceView') initAttendancePage();
 };
 
 // --- MUAT DATA DARI CLOUD ---
 function loadCatalogFromCloud() {
     fetch(GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime())
     .then(res => res.json()).then(data => {
-        products = data.catalog || []; customers = data.customers || []; transactions = data.transactions || []; cashOuts = data.cashOuts || []; usersData = data.users || [];
+        products = data.catalog || []; 
+        customers = data.customers || []; 
+        transactions = data.transactions || []; 
+        cashOuts = data.cashOuts || []; 
+        usersData = data.users || [];
+        attendances = data.attendances || []; // <--- Tambahkan baris ini
         saldoAwal = Number(data.saldoAwal) || 0;
+        
         renderProducts();
         renderFinance();
         renderCustomerDatalist();
@@ -141,6 +148,7 @@ function loadCatalogFromCloud() {
         if (document.getElementById('cashOutView').style.display === 'block') renderCashOutList();
         if (document.getElementById('settingsView').style.display === 'block') renderUsers();
         if (document.getElementById('financeView').style.display === 'block') renderFinanceDetail();
+        if (document.getElementById('attendanceView').style.display === 'block') renderAttendanceList();
     }).catch(() => console.error('Gagal memuat data dari server.'));
 }
 
@@ -676,6 +684,80 @@ if (togglePasswordBtn && pinInput) {
         togglePasswordBtn.innerText = isPassword ? '🙈' : '👁️';
     });
 }
+// --- MODUL PRESENSI KARYAWAN ---
+function initAttendancePage() {
+    if (currentUser) {
+        document.getElementById('attendanceUserGreeting').innerText = `Halo, ${currentUser.username} 👋`;
+    }
+    renderAttendanceList();
+}
 
+// Jam Berjalan Real-time
+setInterval(() => {
+    const clockEl = document.getElementById('liveClock');
+    if (clockEl) {
+        const now = new Date();
+        clockEl.innerText = now.toLocaleTimeString('id-ID');
+    }
+}, 1000);
+
+document.getElementById('clockInBtn').addEventListener('click', () => submitAttendance('Masuk'));
+document.getElementById('clockOutBtn').addEventListener('click', () => submitAttendance('Pulang'));
+
+async function submitAttendance(type) {
+    if (!currentUser) return;
+    if (!confirm(`Catat presensi "${type}" sekarang?`)) return;
+
+    const btnIn = document.getElementById('clockInBtn');
+    const btnOut = document.getElementById('clockOutBtn');
+    if(btnIn) btnIn.disabled = true;
+    if(btnOut) btnOut.disabled = true;
+
+    try {
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'attendance',
+                username: currentUser.username,
+                role: currentUser.role,
+                type: type, // 'Masuk' atau 'Pulang'
+                date: new Date().toISOString()
+            })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+            alert(`Berhasil mencatat presensi: ${type}`);
+            loadCatalogFromCloud();
+        } else {
+            alert('Gagal mencatat presensi.');
+        }
+    } catch (e) {
+        alert('Gagal terhubung ke server.');
+    } finally {
+        if(btnIn) btnIn.disabled = false;
+        if(btnOut) btnOut.disabled = false;
+    }
+}
+
+function renderAttendanceList() {
+    const container = document.getElementById('attendanceList');
+    if (!container) return;
+    if (!attendances || attendances.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;padding:15px;">Belum ada riwayat presensi.</p>';
+        return;
+    }
+    const sorted = [...attendances].sort((a, b) => new Date(b.date) - new Date(a.date));
+    container.innerHTML = sorted.map(a => `
+        <div class="history-card" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <span style="font-weight:700; font-size:13px;">👤 ${a.username} (${a.role || 'Staff'})</span><br>
+                <span style="font-size:11px; color:var(--text-muted);">${formatDateShort(a.date)}</span>
+            </div>
+            <span class="badge ${a.type === 'Masuk' ? 'lunas' : 'belum'}" style="padding: 4px 10px; font-size: 11px;">
+                ${a.type}
+            </span>
+        </div>
+    `).join('');
+}
 // --- INISIALISASI ---
 checkSession();

@@ -81,6 +81,9 @@
                     <div class="menu-card" id="cardFinance" onclick="window.switchView('financeView')">
                         <div class="menu-icon">📊</div><span class="menu-title">Keuangan</span>
                     </div>
+                    <div class="menu-card" id="cardAttendance" onclick="window.switchView('attendanceView')">
+    <div class="menu-icon">⏰</div><span class="menu-title">Presensi</span>
+</div>
                     <div class="menu-card" id="cardAddService" onclick="window.openAddProductModal()">
                         <div class="menu-icon">➕</div><span class="menu-title">Tambah Layanan</span>
                     </div>
@@ -268,8 +271,30 @@
                 </div>
             </div>
         </div>
-
+        <!-- HALAMAN PRESENSI KARYAWAN -->
+<div id="attendanceView" class="view-section" style="display: none;">
+    <div class="back-header">
+        <button class="back-btn" onclick="window.switchView('dashboardView')">←</button>
+        <h2>Presensi Karyawan</h2>
     </div>
+    <div style="padding: 20px; display: flex; flex-direction: column; gap: 15px; padding-bottom: 100px;">
+        <div class="form-card" style="text-align: center; padding: 25px;">
+            <h3 id="attendanceUserGreeting" style="margin-bottom: 5px;">Halo</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">Silakan catat kehadiran Anda hari ini</p>
+            <div id="liveClock" style="font-size: 20px; font-weight: 700; color: var(--primary); margin-bottom: 20px;">00:00:00</div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="clockInBtn" class="btn-primary" style="flex: 1; background: #0f766e;">Masuk (Clock In)</button>
+                <button id="clockOutBtn" class="btn-primary" style="flex: 1; background: #b91c1c;">Pulang (Clock Out)</button>
+            </div>
+        </div>
+
+        <h3 style="font-size: 15px; margin-top: 10px;">Riwayat Presensi</h3>
+        <div class="history-list" id="attendanceList">
+            <!-- Data presensi akan dimuat di sini -->
+        </div>
+    </div>
+</div>
     <script src="script.js"></script>
 </body>
 </html>
