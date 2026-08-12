@@ -365,6 +365,68 @@ checkoutBtn.addEventListener('click', async () => {
     }
 });
 
+// --- MODUL PRINTER THERMAL BLUETOOTH ---
+window.printThermalReceipt = async function(invoice, name, itemsStr, total, cash, change, status) {
+    try {
+        const device = await navigator.bluetooth.requestDevice({ 
+            acceptAllDevices: true, 
+            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455', '0000ff00-0000-1000-8000-00805f9b34fb'] 
+        });
+        if (!device) return; 
+        const server = await device.gatt.connect(); 
+        const services = await server.getPrimaryServices();
+        let tChar = null;
+        for (const s of services) { 
+            for (const c of await s.getCharacteristics()) { 
+                if (c.properties.write || c.properties.writeWithoutResponse) { 
+                    tChar = c; break; 
+                } 
+            } 
+            if (tChar) break; 
+        }
+        if (!tChar) { alert("Gagal menemukan jalur printer."); return; }
+
+        let enc = new TextEncoder(); 
+        let cmds = [];
+        cmds.push(
+            new Uint8Array([0x1B, 0x40]), 
+            enc.encode("\x1b\x61\x01"), 
+            enc.encode("PURIFY LAUNDRY\n--------------------------------\n"), 
+            enc.encode("\x1b\x61\x00"), 
+            enc.encode(`No Nota  : ${invoice}\nTanggal  : ${new Date().toLocaleString('id-ID')}\nPelanggan: ${name || 'Umum'}\nStatus   : ${status}\n--------------------------------\n`), 
+            enc.encode("RINCIAN PESANAN:\n")
+        );
+        
+        itemsStr.split(', ').forEach(i => cmds.push(enc.encode(`- ${i}\n`)));
+        
+        cmds.push(
+            enc.encode("--------------------------------\n"), 
+            enc.encode(`TOTAL    : Rp ${Number(total).toLocaleString('id-ID')}\n`)
+        );
+        
+        if (status === 'Lunas') {
+            cmds.push(
+                enc.encode(`Bayar    : Rp ${Number(cash).toLocaleString('id-ID')}\n`), 
+                enc.encode(`Kembali  : Rp ${Number(change).toLocaleString('id-ID')}\n`)
+            );
+        }
+        
+        cmds.push(
+            enc.encode("--------------------------------\n"), 
+            enc.encode("\x1b\x61\x01"), 
+            enc.encode("Terima Kasih Atas\nKepercayaan Anda!\n\n\n"), 
+            new Uint8Array([0x1D, 0x56, 0x42, 0x00])
+        ); 
+        
+        for (let cmd of cmds) await tChar.writeValue(cmd);
+        alert("Nota berhasil dicetak!"); 
+        server.disconnect();
+    } catch (e) { 
+        alert("Pencetakan dibatalkan atau gagal terhubung ke printer."); 
+        console.error(e);
+    }
+};
+
 // --- MODUL RIWAYAT TRANSAKSI & KIRIM WA ---
 function renderHistory() {
     const container = document.getElementById('historyList');
@@ -386,16 +448,25 @@ function renderHistory() {
                 <span class="hc-cust">${t.name || '-'}</span>
                 <span class="hc-total">${formatRupiah(t.total)}</span>
             </div>
-            ${t.wa ? `<button class="btn-wa" data-invoice="${t.invoice}">📲 Kirim Struk WA</button>` : ''}
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                <button class="btn-print" data-invoice="${t.invoice}" style="background:#0f766e; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; box-shadow: 0 4px 10px rgba(15, 118, 110, 0.3);">🖨️ Cetak Struk</button>
+                ${t.wa ? `<button class="btn-wa" data-invoice="${t.invoice}">📲 Kirim Struk WA</button>` : ''}
+            </div>
         </div>
     `).join('');
 }
 
 document.getElementById('historyList').addEventListener('click', (e) => {
-    if (!e.target.classList.contains('btn-wa')) return;
     const inv = e.target.dataset.invoice;
+    if (!inv) return;
     const trx = transactions.find(t => t.invoice === inv);
-    if (trx) sendReceiptWA(trx);
+    if (!trx) return;
+
+    if (e.target.classList.contains('btn-wa')) {
+        sendReceiptWA(trx);
+    } else if (e.target.classList.contains('btn-print')) {
+        window.printThermalReceipt(trx.invoice, trx.name, trx.items, trx.total, trx.cash || 0, trx.change || 0, trx.status);
+    }
 });
 
 document.getElementById('refreshHistoryBtn').addEventListener('click', () => loadCatalogFromCloud());
