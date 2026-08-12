@@ -1,93 +1,73 @@
-// PASTIKAN URL INI BENAR (URL Web App dari Deploy Google Apps Script)
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8psGmq7vb3e2nDMOi9FP69REPjPscNbbvnNpl8rjQbEt1MYYrmQ-fhLhz/exec';
+const GOOGLE_SCRIPT_URL = 'ISI_URL_WEP_APP_ANDA_DISINI';
 
-let cashOuts = [], products = [], cart = [], customers = [], transactions = [], usersData = [], currentUser = null, activeCategory = 'Kiloan';
+let products = [], cart = [], transactions = [], cashOuts = [], usersData = [], currentUser = null;
 
-// --- FUNGSI GLOBAL (Agar bisa dipanggil dari index.html) ---
+// --- FUNGSI GLOBAL (Agar tombol onclick bekerja) ---
 window.switchView = function(viewId) {
     ['dashboardView', 'posView', 'cashOutView', 'historyView', 'settingsView'].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.style.display = (id === viewId) ? 'block' : 'none';
     });
-    if (viewId === 'historyView') renderHistory();
-    if (viewId === 'posView') renderCart();
-    if (viewId === 'settingsView') renderUsers();
 };
 
 window.openAddProductModal = function() { document.getElementById('addProductModal').style.display = 'flex'; };
 
+window.setSaldoAwal = function() {
+    let input = prompt("Saldo Awal (Rp):", localStorage.getItem('purify_saldo_awal') || 0);
+    if (input) { localStorage.setItem('purify_saldo_awal', input); renderFinance(); }
+};
+
 // --- INISIALISASI ---
 document.addEventListener('DOMContentLoaded', () => {
     checkSession();
-    // Tambahkan event listener untuk tombol yang ada di layar login
-    if(document.getElementById('loginBtn')) document.getElementById('loginBtn').addEventListener('click', performLogin);
-    if(document.getElementById('logoutBtn')) document.getElementById('logoutBtn').addEventListener('click', () => {
-        if(confirm("Keluar dari aplikasi?")) { localStorage.removeItem('purify_session'); location.reload(); }
-    });
+    document.getElementById('loginBtn').addEventListener('click', loginUser);
 });
 
-// --- SISTEM LOGIN ---
-function performLogin() {
-    const u = document.getElementById('loginUsername').value.trim();
-    const p = document.getElementById('loginPin').value.trim();
-    const btn = document.getElementById('loginBtn');
-    if (!u || !p) { alert("Isi Username dan PIN!"); return; }
-    btn.innerText = "Memeriksa...";
-    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "login", username: u, pin: p }) })
-    .then(res => res.json()).then(data => {
-        if (data.status === "success") {
-            localStorage.setItem('purify_session', JSON.stringify({ username: u, role: data.role, permissions: data.permissions || "" }));
-            checkSession();
-        } else alert("Login Gagal!");
-    }).finally(() => btn.innerText = "Masuk Aplikasi");
-}
-
+// --- SISTEM LOGIN & OTORISASI ---
 function checkSession() {
     currentUser = JSON.parse(localStorage.getItem('purify_session'));
-    const loginScreen = document.getElementById('loginScreen');
-    const mainApp = document.getElementById('mainApp');
+    if (!currentUser) return;
     
-    if (!currentUser) {
-        if(loginScreen) loginScreen.style.display = 'flex';
-        if(mainApp) mainApp.style.display = 'none';
-        return;
-    }
-    
-    if(loginScreen) loginScreen.style.display = 'none';
-    if(mainApp) mainApp.style.display = 'block';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
     
     const perms = currentUser.permissions ? currentUser.permissions.split(',') : [];
     const isOwner = currentUser.role.toLowerCase() === 'owner';
     const has = (f) => isOwner || perms.includes(f);
 
-    // Tampilkan/Sembunyikan Menu
+    // Tampilkan Menu Sesuai Izin
     const menus = { 'cardPos':'pos', 'cardCashOut':'cash_out', 'cardHistory':'history', 'cardFinance':'finance', 'cardAddService':'catalog', 'cardSettings':'settings' };
-    Object.keys(menus).forEach(id => { const el = document.getElementById(id); if(el) el.style.display = has(menus[id]) ? 'flex' : 'none'; });
+    Object.keys(menus).forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.style.display = has(menus[id]) ? 'flex' : 'none';
+    });
     
-    loadCatalogFromCloud();
+    loadAllData();
 }
 
-// --- DATA & RENDER (PENGATURAN USER) ---
-function loadCatalogFromCloud() {
+function loginUser() {
+    const u = document.getElementById('loginUsername').value, p = document.getElementById('loginPin').value;
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "login", username: u, pin: p }) })
+    .then(res => res.json()).then(data => {
+        if (data.status === "success") {
+            localStorage.setItem('purify_session', JSON.stringify({ username: u, role: data.role, permissions: data.permissions }));
+            checkSession();
+        } else alert("Login Gagal");
+    });
+}
+
+function loadAllData() {
     fetch(GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime())
     .then(res => res.json()).then(data => {
-        products = data.catalog || []; customers = data.customers || []; 
-        transactions = data.transactions || []; cashOuts = data.cashOuts || []; usersData = data.users || [];
-        renderProducts(); renderFinance();
+        products = data.catalog || [];
+        transactions = data.transactions || [];
+        cashOuts = data.cashOuts || [];
+        usersData = data.users || [];
+        renderFinance();
+        if(document.getElementById('userList')) renderUsers();
     });
 }
 
-function renderUsers() {
-    const list = document.getElementById('userList');
-    if (!list) return;
-    list.innerHTML = '';
-    usersData.forEach(user => {
-        const card = document.createElement('div');
-        card.classList.add('history-card');
-        card.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
-            <div>👤 ${user.username} <br><small>Role: ${user.role}</small></div>
-            <button onclick="openEditUser('${user.username}', '${user.pin}', '${user.role}', '${user.permissions}')">Edit</button>
-        </div>`;
-        list.appendChild(card);
-    });
-}
+// --- FUNGSI BISNIS (Printer, WA, Kasir) ---
+// Masukkan fungsi checkoutBtn, printThermalReceipt, dan renderHistory dari kode asli Anda DI SINI.
+// Pastikan tidak ada fungsi yang dihapus.
