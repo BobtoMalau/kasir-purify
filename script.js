@@ -720,8 +720,7 @@ async function submitAttendance(type) {
                 action: 'attendance',
                 username: currentUser.username,
                 role: currentUser.role,
-                type: type, // 'Masuk' atau 'Pulang'
-                date: new Date().toISOString()
+                type: type
             })
         });
         const result = await res.json();
@@ -746,12 +745,12 @@ function renderAttendanceList() {
         container.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;padding:15px;">Belum ada riwayat presensi.</p>';
         return;
     }
-    const sorted = [...attendances].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sorted = [...attendances].reverse(); // Menampilkan yang terbaru di atas
     container.innerHTML = sorted.map(a => `
         <div class="history-card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <span style="font-weight:700; font-size:13px;">👤 ${a.username} (${a.role || 'Staff'})</span><br>
-                <span style="font-size:11px; color:var(--text-muted);">${formatDateShort(a.date)}</span>
+                <span style="font-size:11px; color:var(--text-muted);">📅 ${a.tanggal || '-'} | ⏰ ${a.waktu || '-'}</span>
             </div>
             <span class="badge ${a.type === 'Masuk' ? 'lunas' : 'belum'}" style="padding: 4px 10px; font-size: 11px;">
                 ${a.type}
