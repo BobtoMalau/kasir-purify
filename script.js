@@ -675,6 +675,16 @@ function renderFinanceDetail() {
         `).join('');
     }
 }
+// --- FITUR LIHAT PASSWORD (MATA) - TARUH DI BAGIAN PALING BAWAH SCRIPT.JS ---
+const togglePasswordBtn = document.getElementById('togglePassword');
+const pinInput = document.getElementById('loginPin');
 
+if (togglePasswordBtn && pinInput) {
+    togglePasswordBtn.addEventListener('click', () => {
+        const isPassword = pinInput.getAttribute('type') === 'password';
+        pinInput.setAttribute('type', isPassword ? 'text' : 'password');
+        togglePasswordBtn.innerText = isPassword ? '🙈' : '👁️';
+    });
+}
 // --- INISIALISASI ---
 checkSession();
