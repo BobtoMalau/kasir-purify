@@ -19,7 +19,10 @@
             <h2>Purify POS</h2>
             <p>Sistem Manajemen Laundry</p>
             <input type="text" id="loginUsername" class="input-field" placeholder="Username">
-            <input type="password" id="loginPin" class="input-field" placeholder="PIN Akses">
+            <div style="position: relative; width: 100%; margin-bottom: 10px;">
+    <input type="password" id="loginPin" class="input-field" placeholder="PIN Akses" style="margin-bottom: 0; padding-right: 40px; width: 100%;">
+    <span id="togglePassword" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 16px;">👁️</span>
+</div>
             <button id="loginBtn" class="btn-primary" style="margin-top: 10px;">Masuk Aplikasi</button>
             <p id="loginMessage" class="error-text"></p>
         </div>

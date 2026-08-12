@@ -44,6 +44,17 @@ function hasCatalogAccess() {
 }
 
 document.getElementById('loginBtn').addEventListener('click', () => {
+    // --- FITUR LIHAT PASSWORD (MATA) ---
+const togglePasswordBtn = document.getElementById('togglePassword');
+const pinInput = document.getElementById('loginPin');
+
+if (togglePasswordBtn && pinInput) {
+    togglePasswordBtn.addEventListener('click', () => {
+        const isPassword = pinInput.getAttribute('type') === 'password';
+        pinInput.setAttribute('type', isPassword ? 'text' : 'password');
+        togglePasswordBtn.innerText = isPassword ? '🙈' : '👁️';
+    });
+}
     const u = document.getElementById('loginUsername').value.trim(), p = document.getElementById('loginPin').value.trim();
     if (!u || !p) { document.getElementById('loginMessage').innerText = "Isi Username dan PIN!"; return; }
     document.getElementById('loginBtn').innerText = "Memeriksa...";
