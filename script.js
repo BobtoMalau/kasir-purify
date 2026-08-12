@@ -1,73 +1,121 @@
-const GOOGLE_SCRIPT_URL = 'ISI_URL_WEP_APP_ANDA_DISINI';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8psGmq7vb3e2nDMOi9FP69REPjPscNbbvnNpl8rjQbEt1MYYrmQ-fhLhz/exec';
 
-let products = [], cart = [], transactions = [], cashOuts = [], usersData = [], currentUser = null;
+let cashOuts = [], products = [], cart = [], customers = [], transactions = [], usersData = [], currentUser = null, activeCategory = 'Kiloan';
 
-// --- FUNGSI GLOBAL (Agar tombol onclick bekerja) ---
-window.switchView = function(viewId) {
-    ['dashboardView', 'posView', 'cashOutView', 'historyView', 'settingsView'].forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.style.display = (id === viewId) ? 'block' : 'none';
-    });
-};
-
-window.openAddProductModal = function() { document.getElementById('addProductModal').style.display = 'flex'; };
-
-window.setSaldoAwal = function() {
-    let input = prompt("Saldo Awal (Rp):", localStorage.getItem('purify_saldo_awal') || 0);
-    if (input) { localStorage.setItem('purify_saldo_awal', input); renderFinance(); }
-};
-
-// --- INISIALISASI ---
-document.addEventListener('DOMContentLoaded', () => {
-    checkSession();
-    document.getElementById('loginBtn').addEventListener('click', loginUser);
-});
+const productGrid = document.getElementById('productGrid'), cartItemsContainer = document.getElementById('cartItems'), checkoutBtn = document.getElementById('checkoutBtn'), loginScreen = document.getElementById('loginScreen'), mainApp = document.getElementById('mainApp'), activeUserLabel = document.getElementById('activeUserLabel');
 
 // --- SISTEM LOGIN & OTORISASI ---
 function checkSession() {
-    currentUser = JSON.parse(localStorage.getItem('purify_session'));
-    if (!currentUser) return;
-    
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'block';
-    
-    const perms = currentUser.permissions ? currentUser.permissions.split(',') : [];
-    const isOwner = currentUser.role.toLowerCase() === 'owner';
-    const has = (f) => isOwner || perms.includes(f);
+    const savedUser = localStorage.getItem('purify_session');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        loginScreen.style.display = 'none';
+        mainApp.style.display = 'block';
+        activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
+        if (document.getElementById('welcomeGreeting')) document.getElementById('welcomeGreeting').innerText = `Halo, ${currentUser.username} 👋`;
 
-    // Tampilkan Menu Sesuai Izin
-    const menus = { 'cardPos':'pos', 'cardCashOut':'cash_out', 'cardHistory':'history', 'cardFinance':'finance', 'cardAddService':'catalog', 'cardSettings':'settings' };
-    Object.keys(menus).forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.style.display = has(menus[id]) ? 'flex' : 'none';
-    });
-    
-    loadAllData();
+        // Logika Hak Akses
+        const perms = currentUser.permissions ? currentUser.permissions.split(',') : [];
+        const isOwner = currentUser.role.toLowerCase() === 'owner';
+        const hasAccess = (feature) => isOwner || perms.includes(feature);
+
+        // Update Tampilan UI berdasarkan hak akses
+        if (document.getElementById('financeCard')) document.getElementById('financeCard').style.display = hasAccess('finance') ? 'block' : 'none';
+        
+        const toggleCard = (id, key) => { const el = document.getElementById(id); if (el) el.style.display = hasAccess(key) ? 'flex' : 'none'; };
+        toggleCard('cardPos', 'pos');
+        toggleCard('cardCashOut', 'cash_out');
+        toggleCard('cardHistory', 'history');
+        toggleCard('cardFinance', 'finance');
+        toggleCard('cardAddService', 'catalog');
+        toggleCard('cardSettings', 'settings');
+
+        switchView('dashboardView');
+        loadCatalogFromCloud();
+    } else {
+        loginScreen.style.display = 'flex';
+        mainApp.style.display = 'none';
+    }
 }
 
-function loginUser() {
-    const u = document.getElementById('loginUsername').value, p = document.getElementById('loginPin').value;
+document.getElementById('loginBtn').addEventListener('click', () => {
+    const u = document.getElementById('loginUsername').value.trim(), p = document.getElementById('loginPin').value.trim();
+    if (!u || !p) { document.getElementById('loginMessage').innerText = "Isi Username dan PIN!"; return; }
+    document.getElementById('loginBtn').innerText = "Memeriksa...";
     fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "login", username: u, pin: p }) })
     .then(res => res.json()).then(data => {
         if (data.status === "success") {
-            localStorage.setItem('purify_session', JSON.stringify({ username: u, role: data.role, permissions: data.permissions }));
+            localStorage.setItem('purify_session', JSON.stringify({ username: u, role: data.role, permissions: data.permissions || "" }));
             checkSession();
-        } else alert("Login Gagal");
+        } else document.getElementById('loginMessage').innerText = "Username/PIN salah!";
+    }).finally(() => document.getElementById('loginBtn').innerText = "Masuk Aplikasi");
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    if(confirm("Keluar dari aplikasi?")) { localStorage.removeItem('purify_session'); location.reload(); }
+});
+
+// --- MANAJEMEN USER & PERMISSIONS ---
+function renderUsers() {
+    const list = document.getElementById('userList');
+    if (!list) return;
+    list.innerHTML = '';
+    usersData.forEach(user => {
+        const card = document.createElement('div');
+        card.classList.add('history-card');
+        card.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
+            <div><span style="font-weight:700;">👤 ${user.username}</span><br><small>Role: ${user.role} | Izin: ${user.permissions || 'Tidak ada'}</small></div>
+            <div style="display:flex; gap:5px;">
+                <button onclick="openEditUser('${user.username}', '${user.pin}', '${user.role}', '${user.permissions}')" style="background:#e0f2f1; color:#007770; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">Edit</button>
+                ${user.username !== currentUser.username ? `<button onclick="deleteUser('${user.username}')" style="background:#fee2e2; color:#991b1b; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">Hapus</button>` : ''}
+            </div>
+        </div>`;
+        list.appendChild(card);
     });
 }
 
-function loadAllData() {
+window.openEditUser = function(u, p, r, perms) {
+    document.getElementById('editUserLabel').innerText = u;
+    document.getElementById('editUsername').value = u;
+    document.getElementById('editUserPin').value = p;
+    document.getElementById('editUserRole').value = r;
+    const permsArr = perms ? perms.split(',') : [];
+    const container = document.getElementById('editPermissionsContainer');
+    container.innerHTML = ['pos', 'cash_out', 'history', 'finance', 'catalog', 'settings'].map(f => `
+        <label><input type="checkbox" class="edit-perm" value="${f}" ${permsArr.includes(f) ? 'checked' : ''}> ${f.toUpperCase()}</label>
+    `).join('');
+    document.getElementById('editUserModal').style.display = 'flex';
+};
+
+document.getElementById('updateUserBtn').addEventListener('click', () => {
+    const u = document.getElementById('editUsername').value, perms = Array.from(document.querySelectorAll('.edit-perm:checked')).map(cb => cb.value).join(',');
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: "update_user", username: u, pin: document.getElementById('editUserPin').value, role: document.getElementById('editUserRole').value, permissions: perms }) })
+    .then(() => { alert("Update berhasil!"); document.getElementById('editUserModal').style.display = 'none'; loadCatalogFromCloud(); });
+});
+
+document.getElementById('saveUserBtn').addEventListener('click', () => {
+    const uName = document.getElementById('newUsername').value, perms = Array.from(document.querySelectorAll('.perm-checkbox:checked')).map(cb => cb.value).join(',');
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: "add_user", username: uName, pin: document.getElementById('newUserPin').value, role: document.getElementById('newUserRole').value, permissions: perms }) })
+    .then(() => { alert("User ditambahkan!"); document.getElementById('addUserModal').style.display = 'none'; loadCatalogFromCloud(); });
+});
+
+// --- FUNGSI LAIN (KASIR, TRANSAKSI, PRODUK) ---
+window.switchView = function(viewId) {
+    ['dashboardView', 'posView', 'cashOutView', 'historyView', 'settingsView'].forEach(id => document.getElementById(id).style.display = (id === viewId) ? 'block' : 'none');
+    if (viewId === 'historyView') renderHistory();
+    if (viewId === 'posView') renderCart();
+    if (viewId === 'settingsView') renderUsers();
+};
+
+function loadCatalogFromCloud() {
     fetch(GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime())
     .then(res => res.json()).then(data => {
-        products = data.catalog || [];
-        transactions = data.transactions || [];
-        cashOuts = data.cashOuts || [];
-        usersData = data.users || [];
-        renderFinance();
-        if(document.getElementById('userList')) renderUsers();
+        products = data.catalog || []; customers = data.customers || []; transactions = data.transactions || []; cashOuts = data.cashOuts || []; usersData = data.users || [];
+        renderProducts(); renderFinance(); if(document.getElementById('settingsView').style.display === 'block') renderUsers();
     });
 }
 
-// --- FUNGSI BISNIS (Printer, WA, Kasir) ---
-// Masukkan fungsi checkoutBtn, printThermalReceipt, dan renderHistory dari kode asli Anda DI SINI.
-// Pastikan tidak ada fungsi yang dihapus.
+// (Fungsi render lainnya seperti renderProducts, renderCart, checkoutBtn, dll tetap sama seperti kode Anda sebelumnya)
+// Pastikan fungsi-fungsi pendukung yang Anda miliki tidak terhapus.
+
+checkSession();
