@@ -64,26 +64,31 @@
                 </div>
 
                 <div class="menu-grid">
-                    <div class="menu-card" onclick="switchView('posView')">
-                        <div class="menu-icon">🛒</div><span class="menu-title">Kasir (POS)</span>
-                    </div>
-                    <div class="menu-card" onclick="switchView('cashOutView')">
-                        <div class="menu-icon">💸</div><span class="menu-title">Kas Keluar</span>
-                    </div>
-                    <div class="menu-card" onclick="switchView('historyView')">
-                        <div class="menu-icon">📋</div><span class="menu-title">Riwayat</span>
-                    </div>
-                    <div class="menu-card" id="menuAddService" onclick="openAddProductModal()" style="display: none;">
-                        <div class="menu-icon">➕</div><span class="menu-title">Tambah Layanan</span>
-                    </div>
-                    <!-- MENU PENGATURAN AKSES (Hanya Owner) -->
-                    <div class="menu-card" id="menuSettings" onclick="switchView('settingsView')" style="display: none; border-color: var(--primary);">
-                        <div class="menu-icon" style="background: var(--primary); color: white;">⚙️</div>
-                        <span class="menu-title">Pengaturan Akses</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <!-- Kasir -->
+    <div class="menu-card" id="cardPos" onclick="switchView('posView')">
+        <div class="menu-icon">🛒</div><span class="menu-title">Kasir (POS)</span>
+    </div>
+    <!-- Kas Keluar -->
+    <div class="menu-card" id="cardCashOut" onclick="switchView('cashOutView')">
+        <div class="menu-icon">💸</div><span class="menu-title">Kas Keluar</span>
+    </div>
+    <!-- Riwayat -->
+    <div class="menu-card" id="cardHistory" onclick="switchView('historyView')">
+        <div class="menu-icon">📋</div><span class="menu-title">Riwayat</span>
+    </div>
+    <!-- Ringkasan Keuangan -->
+    <div class="menu-card" id="cardFinance" onclick="switchView('dashboardView')">
+        <div class="menu-icon">📊</div><span class="menu-title">Ringkasan</span>
+    </div>
+    <!-- Tambah Layanan -->
+    <div class="menu-card" id="cardAddService" onclick="openAddProductModal()">
+        <div class="menu-icon">➕</div><span class="menu-title">Tambah Layanan</span>
+    </div>
+    <!-- Pengaturan Akses -->
+    <div class="menu-card" id="cardSettings" onclick="switchView('settingsView')">
+        <div class="menu-icon">⚙️</div><span class="menu-title">Pengaturan</span>
+    </div>
+</div>
 
         <!-- 2. HALAMAN KASIR (FULL FORM) -->
         <div id="posView" class="view-section" style="display: none; padding-bottom: 100px;">
@@ -186,17 +191,30 @@
             </div>
         </div>
 
-        <!-- Modal Tambah Pengguna -->
+        <!-- MODAL TAMBAH PENGGUNA DENGAN CHECKBOX HAK AKSES -->
         <div id="addUserModal" class="modal-overlay" style="display: none;">
-            <div class="modal-card">
-                <h3>Tambah Pengguna Akses</h3>
-                <div class="input-group"><label>Username</label><input type="text" id="newUsername" placeholder="Cth: kasir1"></div>
+            <div class="modal-card" style="max-height: 90vh; overflow-y: auto;">
+                <h3>Tambah Pengguna & Hak Akses</h3>
+                <div class="input-group"><label>Username</label><input type="text" id="newUsername" placeholder="Cth: kasir_satu"></div>
                 <div class="input-group"><label>PIN Akses (Angka)</label><input type="number" id="newUserPin" placeholder="Cth: 123456"></div>
                 <div class="input-group">
-                    <label>Peran (Role)</label>
-                    <select id="newUserRole"><option value="Kasir">Kasir</option><option value="Owner">Owner</option></select>
+                    <label>Peran (Role Label)</label>
+                    <input type="text" id="newUserRole" value="Kasir" placeholder="Cth: Kasir / Staff">
                 </div>
-                <div class="modal-actions">
+                
+                <div class="input-group" style="margin-top: 15px;">
+                    <label style="font-weight: 700; color: var(--primary); margin-bottom: 8px; display: block;">Pilih Menu yang Diizinkan:</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <label style="font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" class="perm-checkbox" value="pos" checked> 🛒 Akses Kasir (POS)</label>
+                        <label style="font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" class="perm-checkbox" value="cash_out"> 💸 Akses Kas Keluar</label>
+                        <label style="font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" class="perm-checkbox" value="history" checked> 📋 Akses Riwayat Transaksi</label>
+                        <label style="font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" class="perm-checkbox" value="finance"> 📊 Akses Ringkasan Keuangan</label>
+                        <label style="font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" class="perm-checkbox" value="catalog"> ➕ Akses Tambah/Hapus Layanan</label>
+                        <label style="font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" class="perm-checkbox" value="settings"> ⚙️ Akses Pengaturan Akses</label>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 15px;">
                     <button onclick="document.getElementById('addUserModal').style.display='none'" class="btn-text">Batal</button>
                     <button id="saveUserBtn" class="btn-primary-small">Simpan Pengguna</button>
                 </div>

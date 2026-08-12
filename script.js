@@ -1,3 +1,4 @@
+// GANTI DENGAN URL GOOGLE APPS SCRIPT MILIK ANDA
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8psGmq7vb3e2nDMOi9FP69REPjPscNbbvnNpl8rjQbEt1MYYrmQ-fhLhz/exec';
 
 let cashOuts = [];
@@ -5,7 +6,7 @@ let products = [];
 let cart = [];
 let customers = [];
 let transactions = [];
-let usersData = []; // Data pengguna khusus owner
+let usersData = []; 
 let currentUser = null;
 let activeCategory = 'Kiloan';
 
@@ -16,7 +17,7 @@ const loginScreen = document.getElementById('loginScreen');
 const mainApp = document.getElementById('mainApp');
 const activeUserLabel = document.getElementById('activeUserLabel');
 
-// --- SISTEM LOGIN & OTORISASI AKSES ---
+// --- SISTEM LOGIN & OTORISASI AKSES BERBASIS PERMISSIONS ---
 function checkSession() {
     const savedUser = localStorage.getItem('purify_session');
     if (savedUser) {
@@ -25,22 +26,32 @@ function checkSession() {
         mainApp.style.display = 'block';
         
         activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
-        const userRole = currentUser.role.toLowerCase(); 
-        
-        // HIDE/SHOW FITUR BERDASARKAN ROLE
-        const isOwner = userRole === 'owner';
-        
-        const menuAddService = document.getElementById('menuAddService');
-        if (menuAddService) menuAddService.style.display = isOwner ? 'flex' : 'none';
-        
-        const menuSettings = document.getElementById('menuSettings');
-        if (menuSettings) menuSettings.style.display = isOwner ? 'flex' : 'none';
-        
-        const financeCard = document.getElementById('financeCard');
-        if (financeCard) financeCard.style.display = isOwner ? 'block' : 'none';
-        
         const greeting = document.getElementById('welcomeGreeting');
         if (greeting) greeting.innerText = `Halo, ${currentUser.username} 👋`;
+
+        // Ambil hak akses dari sesi
+        const perms = currentUser.permissions ? currentUser.permissions.split(',') : [];
+        const isOwner = currentUser.role.toLowerCase() === 'owner';
+
+        // Fungsi cek akses: Jika Owner selalu TRUE, jika bukan cek centangan
+        const hasAccess = (feature) => isOwner || perms.includes(feature);
+
+        // Update Tampilan Panel Keuangan (Finance Card)
+        const financeCard = document.getElementById('financeCard');
+        if (financeCard) financeCard.style.display = hasAccess('finance') ? 'block' : 'none';
+
+        // Update Tampilan Menu di Dashboard (Berdasarkan ID Card di index.html)
+        const toggleCard = (cardId, permissionKey) => {
+            const card = document.getElementById(cardId);
+            if (card) card.style.display = hasAccess(permissionKey) ? 'flex' : 'none';
+        };
+
+        toggleCard('cardPos', 'pos');
+        toggleCard('cardCashOut', 'cash_out');
+        toggleCard('cardHistory', 'history');
+        toggleCard('cardFinance', 'finance');
+        toggleCard('cardAddService', 'catalog');
+        toggleCard('cardSettings', 'settings');
 
         switchView('dashboardView');
         loadCatalogFromCloud();
@@ -64,7 +75,12 @@ document.getElementById('loginBtn').addEventListener('click', () => {
         body: JSON.stringify({ action: "login", username: u, pin: p })
     }).then(res => res.json()).then(data => {
         if (data.status === "success") {
-            localStorage.setItem('purify_session', JSON.stringify({ username: u, role: data.role }));
+            // Simpan sesi lengkap dengan data permissions
+            localStorage.setItem('purify_session', JSON.stringify({ 
+                username: u, 
+                role: data.role, 
+                permissions: data.permissions || "" 
+            }));
             document.getElementById('loginUsername').value = ''; document.getElementById('loginPin').value = '';
             checkSession();
         } else msg.innerText = "Username atau PIN salah!";
@@ -92,7 +108,7 @@ window.openAddProductModal = function() {
     document.getElementById('addProductModal').style.display = 'flex';
 };
 
-// --- MONITORING KEUANGAN (HANYA OWNER YANG BISA LIHAT) ---
+// --- MONITORING KEUANGAN ---
 function renderFinance() {
     let saldoAwal = parseFloat(localStorage.getItem('purify_saldo_awal')) || 0;
     let totalLunas = transactions.filter(t => t.status === 'Lunas').reduce((sum, t) => sum + (Number(t.total) || 0), 0);
@@ -128,7 +144,7 @@ function loadCatalogFromCloud() {
         .then(data => { 
             products = data.catalog || []; customers = data.customers || []; 
             transactions = data.transactions || []; cashOuts = data.cashOuts || []; 
-            usersData = data.users || []; // Tarik data akun pengguna
+            usersData = data.users || []; 
             
             renderProducts(); populateCustomerList(); renderFinance(); 
             if(document.getElementById('settingsView').style.display === 'block') renderUsers();
@@ -149,8 +165,6 @@ function renderUsers() {
     usersData.forEach(user => {
         const card = document.createElement('div');
         card.classList.add('history-card');
-        
-        // Mencegah owner menghapus dirinya sendiri
         const isMe = user.username === currentUser.username;
         
         card.innerHTML = `
@@ -166,35 +180,39 @@ function renderUsers() {
     });
 }
 
+// SIMPAN PENGGUNA DENGAN CHECKBOX HAK AKSES
 document.getElementById('saveUserBtn').addEventListener('click', () => {
     const uName = document.getElementById('newUsername').value.trim();
     const uPin = document.getElementById('newUserPin').value.trim();
-    const uRole = document.getElementById('newUserRole').value;
+    const uRole = document.getElementById('newUserRole').value.trim() || "Kasir";
     
     if (!uName || !uPin) { alert("Isi Username dan PIN dengan benar!"); return; }
     
-    // Cek duplikasi
+    // Ambil semua centangan izin
+    const checkboxes = document.querySelectorAll('.perm-checkbox:checked');
+    const selectedPerms = Array.from(checkboxes).map(cb => cb.value).join(',');
+
     const exist = usersData.find(u => u.username.toLowerCase() === uName.toLowerCase());
-    if (exist) { alert("Username sudah terdaftar! Gunakan nama lain."); return; }
+    if (exist) { alert("Username sudah terdaftar!"); return; }
 
     const btn = document.getElementById('saveUserBtn');
     btn.innerText = "Menyimpan..."; btn.disabled = true;
 
     fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "add_user", username: uName, pin: uPin, role: uRole })
+        body: JSON.stringify({ action: "add_user", username: uName, pin: uPin, role: uRole, permissions: selectedPerms })
     }).then(() => {
-        alert("Pengguna berhasil ditambahkan!");
+        alert("Pengguna & Hak Akses berhasil disimpan!");
         document.getElementById('addUserModal').style.display = 'none';
         document.getElementById('newUsername').value = ''; document.getElementById('newUserPin').value = '';
-        loadCatalogFromCloud(); // Refresh data
+        loadCatalogFromCloud();
     }).catch(() => alert("Koneksi error")).finally(() => { btn.innerText = "Simpan Pengguna"; btn.disabled = false; });
 });
 
 window.deleteUser = function(username) {
-    if(confirm(`Yakin ingin menghapus akses untuk kasir '${username}'?`)) {
+    if(confirm(`Yakin ingin menghapus akses untuk '${username}'?`)) {
         usersData = usersData.filter(u => u.username !== username);
-        renderUsers(); // Update UI langsung
+        renderUsers();
         fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: "delete_user", username: username })
