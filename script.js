@@ -1,6 +1,7 @@
 // GANTI DENGAN URL GOOGLE APPS SCRIPT MILIK ANDA
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8psGmq7vb3e2nDMOi9FP69REPjPscNbbvnNpl8rjQbEt1MYYrmQ-fhLhz/exec';
 
+let cashOuts = [];
 let products = [];
 let cart = [];
 let customers = [];
@@ -71,6 +72,38 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
     if(confirm("Keluar dari aplikasi?")) { localStorage.removeItem('purify_session'); currentUser = null; cart = []; checkSession(); }
 });
 
+// --- MESIN PENGHITUNG KEUANGAN ---
+function renderFinance() {
+    // 1. Ambil Saldo Awal yang tersimpan di memori HP
+    let saldoAwal = parseFloat(localStorage.getItem('purify_saldo_awal')) || 0;
+
+    // 2. Hitung Uang Masuk (Lunas) dan Uang Menggantung (Belum Lunas)
+    let totalLunas = transactions.filter(t => t.status === 'Lunas').reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+    let totalPiutang = transactions.filter(t => t.status === 'Belum Lunas').reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+    
+    // 3. Hitung Pengeluaran
+    let totalPengeluaran = cashOuts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+
+    // 4. Hitung Hasil Akhir
+    let saldoAktual = saldoAwal + totalLunas - totalPengeluaran;
+    let saldoProyeksi = saldoAktual + totalPiutang;
+
+    // 5. Cetak ke Layar
+    document.getElementById('saldoAktualTxt').innerText = `Rp ${saldoAktual.toLocaleString('id-ID')}`;
+    document.getElementById('saldoProyeksiTxt').innerText = `Rp ${saldoProyeksi.toLocaleString('id-ID')}`;
+}
+
+// Fungsi untuk tombol ubah saldo awal
+window.setSaldoAwal = function() {
+    let current = localStorage.getItem('purify_saldo_awal') || 0;
+    let input = prompt("Masukkan jumlah Saldo Awal di Laci / Bank (Rp):", current);
+    if (input !== null && !isNaN(input) && input.trim() !== '') {
+        localStorage.setItem('purify_saldo_awal', parseFloat(input));
+        renderFinance(); // Hitung ulang
+        alert("Saldo awal berhasil disimpan!");
+    }
+};
+
 // --- SISTEM PERPINDAHAN HALAMAN ---
 window.switchView = function(viewId) {
     const views = ['dashboardView', 'posView', 'cashOutView', 'historyView'];
@@ -105,9 +138,11 @@ function loadCatalogFromCloud() {
             products = data.catalog || []; 
             customers = data.customers || []; 
             transactions = data.transactions || []; 
-            
+            cashOuts = data.cashOuts || []; // <-- Tambahkan baris ini
+
             renderProducts(); 
-            populateCustomerList(); 
+            populateCustomerList();
+            renderFinance(); // <-- Tambahkan baris ini 
         })
         .catch((err) => {
             grid.innerHTML = `<p style="text-align:center; grid-column:1/-1; color:red; font-size:13px; margin-top:20px;">Gagal memuat. Periksa internet Anda.</p>`;
