@@ -158,27 +158,57 @@ function renderUsers() {
     if (!list) return;
     list.innerHTML = '';
     
-    if (usersData.length === 0) {
-        list.innerHTML = `<p style="text-align:center; color:gray; font-size:13px;">Belum ada data pengguna.</p>`; return;
-    }
-
     usersData.forEach(user => {
         const card = document.createElement('div');
         card.classList.add('history-card');
-        const isMe = user.username === currentUser.username;
-        
         card.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    <span style="font-weight:700; font-size:15px;">👤 ${user.username}</span><br>
-                    <span style="font-size:12px; color:gray;">PIN: ${user.pin} | Role: <b>${user.role}</b></span>
+                    <span style="font-weight:700;">👤 ${user.username}</span><br>
+                    <small>Role: ${user.role} | Izin: ${user.permissions}</small>
                 </div>
-                ${!isMe ? `<button onclick="deleteUser('${user.username}')" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:6px 12px; font-weight:bold; cursor:pointer;">Hapus</button>` : `<span style="font-size:12px; color:var(--primary); font-weight:bold;">(Anda)</span>`}
+                <div style="display:flex; gap:5px;">
+                    <button onclick="openEditUser('${user.username}', '${user.pin}', '${user.role}', '${user.permissions}')" style="background:#e0f2f1; color:#007770; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">Edit</button>
+                    ${user.username !== currentUser.username ? `<button onclick="deleteUser('${user.username}')" style="background:#fee2e2; color:#991b1b; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">Hapus</button>` : ''}
+                </div>
             </div>
         `;
         list.appendChild(card);
     });
 }
+
+window.openEditUser = function(u, p, r, perms) {
+    document.getElementById('editUserLabel').innerText = u;
+    document.getElementById('editUsername').value = u;
+    document.getElementById('editUserPin').value = p;
+    document.getElementById('editUserRole').value = r;
+    
+    // Render checkbox di modal edit
+    const permsArr = perms.split(',');
+    const container = document.getElementById('editPermissionsContainer');
+    const features = ['pos', 'cash_out', 'history', 'finance', 'catalog', 'settings'];
+    container.innerHTML = features.map(f => `
+        <label><input type="checkbox" class="edit-perm" value="${f}" ${permsArr.includes(f) ? 'checked' : ''}> ${f.toUpperCase()}</label>
+    `).join('');
+    
+    document.getElementById('editUserModal').style.display = 'flex';
+};
+
+document.getElementById('updateUserBtn').addEventListener('click', () => {
+    const u = document.getElementById('editUsername').value;
+    const p = document.getElementById('editUserPin').value;
+    const r = document.getElementById('editUserRole').value;
+    const perms = Array.from(document.querySelectorAll('.edit-perm:checked')).map(cb => cb.value).join(',');
+    
+    fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "update_user", username: u, pin: p, role: r, permissions: perms })
+    }).then(() => {
+        alert("Berhasil diupdate!");
+        document.getElementById('editUserModal').style.display = 'none';
+        loadCatalogFromCloud();
+    });
+});
 
 // SIMPAN PENGGUNA DENGAN CHECKBOX HAK AKSES
 document.getElementById('saveUserBtn').addEventListener('click', () => {
