@@ -28,7 +28,7 @@ function checkSession() {
         toggleCard('cardAddService', 'catalog');
         toggleCard('cardSettings', 'settings');
 
-        switchView('dashboardView');
+        window.switchView('dashboardView');
         loadCatalogFromCloud();
     } else {
         loginScreen.style.display = 'flex';
@@ -117,11 +117,15 @@ window.deleteUser = function(username) {
 
 // --- NAVIGASI VIEW ---
 window.switchView = function(viewId) {
-    ['dashboardView', 'posView', 'cashOutView', 'historyView', 'settingsView'].forEach(id => document.getElementById(id).style.display = (id === viewId) ? 'block' : 'none');
+    ['dashboardView', 'posView', 'cashOutView', 'historyView', 'settingsView', 'financeView'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (id === viewId) ? 'block' : 'none';
+    });
     if (viewId === 'historyView') renderHistory();
     if (viewId === 'posView') renderCart();
     if (viewId === 'cashOutView') renderCashOutList();
     if (viewId === 'settingsView') renderUsers();
+    if (viewId === 'financeView') renderFinanceDetail();
 };
 
 // --- MUAT DATA DARI CLOUD ---
@@ -136,6 +140,7 @@ function loadCatalogFromCloud() {
         if (document.getElementById('historyView').style.display === 'block') renderHistory();
         if (document.getElementById('cashOutView').style.display === 'block') renderCashOutList();
         if (document.getElementById('settingsView').style.display === 'block') renderUsers();
+        if (document.getElementById('financeView').style.display === 'block') renderFinanceDetail();
     }).catch(() => console.error('Gagal memuat data dari server.'));
 }
 
@@ -148,7 +153,7 @@ function formatRupiah(num) {
 function formatDateShort(d) {
     const date = new Date(d);
     if (isNaN(date)) return '';
-    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatWhatsApp(number) {
@@ -208,7 +213,7 @@ function addToCart(product) {
         });
     }
     renderCart();
-    switchView('posView');
+    window.switchView('posView');
 }
 
 function renderCart() {
@@ -353,7 +358,7 @@ checkoutBtn.addEventListener('click', async () => {
             document.getElementById('paymentStatus').value = 'Lunas';
             renderCart();
             loadCatalogFromCloud();
-            switchView('dashboardView');
+            window.switchView('dashboardView');
         } else {
             alert('Gagal menyimpan transaksi: ' + (result.message || 'Terjadi kesalahan'));
         }
@@ -572,13 +577,15 @@ window.deleteProduct = function(productId) {
     }).catch(() => alert('Gagal terhubung ke server.'));
 };
 
-// --- MODUL KEUANGAN (SALDO) ---
+// --- MODUL KEUANGAN (SALDO & LAPORAN DETAIL) ---
 function renderFinance() {
     const totalLunas = transactions.filter(t => t.status === 'Lunas').reduce((s, t) => s + Number(t.total || 0), 0);
     const totalPiutang = transactions.filter(t => t.status !== 'Lunas').reduce((s, t) => s + Number(t.total || 0), 0);
     const totalKasKeluar = cashOuts.reduce((s, c) => s + Number(c.amount || 0), 0);
     const saldoAktual = saldoAwal + totalLunas - totalKasKeluar;
     const saldoProyeksi = saldoAktual + totalPiutang;
+    
+    // Update Dashboard Card
     const elAktual = document.getElementById('saldoAktualTxt');
     const elProyeksi = document.getElementById('saldoProyeksiTxt');
     if (elAktual) elAktual.innerText = formatRupiah(saldoAktual);
@@ -596,6 +603,67 @@ window.setSaldoAwal = function() {
         else alert('Gagal menyimpan saldo awal.');
     }).catch(() => alert('Gagal terhubung ke server.'));
 };
+
+// Fitur Baru: Render Laporan Detail Keuangan
+function renderFinanceDetail() {
+    const totalLunas = transactions.filter(t => t.status === 'Lunas').reduce((s, t) => s + Number(t.total || 0), 0);
+    const totalPiutang = transactions.filter(t => t.status !== 'Lunas').reduce((s, t) => s + Number(t.total || 0), 0);
+    const totalKasKeluar = cashOuts.reduce((s, c) => s + Number(c.amount || 0), 0);
+    const saldoAktual = saldoAwal + totalLunas - totalKasKeluar;
+    const saldoProyeksi = saldoAktual + totalPiutang;
+
+    // Update Ringkasan Angka
+    document.getElementById('detailSaldoAwal').innerText = formatRupiah(saldoAwal);
+    document.getElementById('detailPemasukan').innerText = '+ ' + formatRupiah(totalLunas);
+    document.getElementById('detailPengeluaran').innerText = '- ' + formatRupiah(totalKasKeluar);
+    document.getElementById('detailSaldoAktual').innerText = formatRupiah(saldoAktual);
+    document.getElementById('detailPiutang').innerText = formatRupiah(totalPiutang);
+    document.getElementById('detailSaldoProyeksi').innerText = formatRupiah(saldoProyeksi);
+
+    // Proses Arus Kas (Uang Masuk & Keluar)
+    let cashFlow = [];
+    
+    // Uang Masuk dari Transaksi Lunas
+    transactions.filter(t => t.status === 'Lunas').forEach(t => {
+        cashFlow.push({
+            date: t.date,
+            desc: `Pembayaran ${t.invoice} - ${t.name || 'Umum'}`,
+            type: 'in',
+            amount: t.total
+        });
+    });
+    
+    // Uang Keluar
+    cashOuts.forEach(c => {
+        cashFlow.push({
+            date: c.date,
+            desc: `Kas Keluar: ${c.description}`,
+            type: 'out',
+            amount: c.amount
+        });
+    });
+
+    // Urutkan berdasarkan waktu paling baru
+    cashFlow.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Render ke List
+    const container = document.getElementById('cashFlowList');
+    if (cashFlow.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:13px; padding:15px;">Belum ada arus kas uang masuk/keluar.</p>';
+    } else {
+        container.innerHTML = cashFlow.map(f => `
+            <div style="background: white; padding: 12px 15px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; flex-direction: column; gap: 3px;">
+                    <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">${f.desc}</span>
+                    <span style="font-size: 11px; color: var(--text-muted);">${formatDateShort(f.date)}</span>
+                </div>
+                <span style="font-size: 14px; font-weight: 700; color: ${f.type === 'in' ? 'var(--primary)' : 'var(--danger)'};">
+                    ${f.type === 'in' ? '+' : '-'} ${formatRupiah(f.amount)}
+                </span>
+            </div>
+        `).join('');
+    }
+}
 
 // --- INISIALISASI ---
 checkSession();
