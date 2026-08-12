@@ -1,6 +1,6 @@
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCYJnSNPD8psGmq7vb3e2nDMOi9FP69REPjPscNbbvnNpl8rjQbEt1MYYrmQ-fhLhz/exec';
 
-let cashOuts = [], products = [], cart = [], customers = [], transactions = [], usersData = [], currentUser = null, activeCategory = 'Kiloan';
+let cashOuts = [], products = [], cart = [], customers = [], transactions = [], usersData = [], currentUser = null, activeCategory = 'Kiloan', saldoAwal = 0;
 
 const productGrid = document.getElementById('productGrid'), cartItemsContainer = document.getElementById('cartItems'), checkoutBtn = document.getElementById('checkoutBtn'), loginScreen = document.getElementById('loginScreen'), mainApp = document.getElementById('mainApp'), activeUserLabel = document.getElementById('activeUserLabel');
 
@@ -14,14 +14,12 @@ function checkSession() {
         activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
         if (document.getElementById('welcomeGreeting')) document.getElementById('welcomeGreeting').innerText = `Halo, ${currentUser.username} 👋`;
 
-        // Logika Hak Akses
         const perms = currentUser.permissions ? currentUser.permissions.split(',') : [];
         const isOwner = currentUser.role.toLowerCase() === 'owner';
         const hasAccess = (feature) => isOwner || perms.includes(feature);
 
-        // Update Tampilan UI berdasarkan hak akses
         if (document.getElementById('financeCard')) document.getElementById('financeCard').style.display = hasAccess('finance') ? 'block' : 'none';
-        
+
         const toggleCard = (id, key) => { const el = document.getElementById(id); if (el) el.style.display = hasAccess(key) ? 'flex' : 'none'; };
         toggleCard('cardPos', 'pos');
         toggleCard('cardCashOut', 'cash_out');
@@ -38,6 +36,13 @@ function checkSession() {
     }
 }
 
+function hasCatalogAccess() {
+    if (!currentUser) return false;
+    if (currentUser.role.toLowerCase() === 'owner') return true;
+    const perms = currentUser.permissions ? currentUser.permissions.split(',') : [];
+    return perms.includes('catalog');
+}
+
 document.getElementById('loginBtn').addEventListener('click', () => {
     const u = document.getElementById('loginUsername').value.trim(), p = document.getElementById('loginPin').value.trim();
     if (!u || !p) { document.getElementById('loginMessage').innerText = "Isi Username dan PIN!"; return; }
@@ -48,7 +53,8 @@ document.getElementById('loginBtn').addEventListener('click', () => {
             localStorage.setItem('purify_session', JSON.stringify({ username: u, role: data.role, permissions: data.permissions || "" }));
             checkSession();
         } else document.getElementById('loginMessage').innerText = "Username/PIN salah!";
-    }).finally(() => document.getElementById('loginBtn').innerText = "Masuk Aplikasi");
+    }).catch(() => { document.getElementById('loginMessage').innerText = "Gagal terhubung ke server. Cek koneksi internet."; })
+    .finally(() => document.getElementById('loginBtn').innerText = "Masuk Aplikasi");
 });
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -95,27 +101,430 @@ document.getElementById('updateUserBtn').addEventListener('click', () => {
 
 document.getElementById('saveUserBtn').addEventListener('click', () => {
     const uName = document.getElementById('newUsername').value, perms = Array.from(document.querySelectorAll('.perm-checkbox:checked')).map(cb => cb.value).join(',');
+    if (!uName || !document.getElementById('newUserPin').value) { alert('Username dan PIN wajib diisi!'); return; }
     fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: "add_user", username: uName, pin: document.getElementById('newUserPin').value, role: document.getElementById('newUserRole').value, permissions: perms }) })
     .then(() => { alert("User ditambahkan!"); document.getElementById('addUserModal').style.display = 'none'; loadCatalogFromCloud(); });
 });
 
-// --- FUNGSI LAIN (KASIR, TRANSAKSI, PRODUK) ---
+window.deleteUser = function(username) {
+    if (!confirm(`Hapus pengguna "${username}"?`)) return;
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "delete_user", username }) })
+    .then(res => res.json()).then(result => {
+        if (result.status === 'success') loadCatalogFromCloud();
+        else alert('Gagal menghapus pengguna.');
+    }).catch(() => alert('Gagal terhubung ke server.'));
+};
+
+// --- NAVIGASI VIEW ---
 window.switchView = function(viewId) {
     ['dashboardView', 'posView', 'cashOutView', 'historyView', 'settingsView'].forEach(id => document.getElementById(id).style.display = (id === viewId) ? 'block' : 'none');
     if (viewId === 'historyView') renderHistory();
     if (viewId === 'posView') renderCart();
+    if (viewId === 'cashOutView') renderCashOutList();
     if (viewId === 'settingsView') renderUsers();
 };
 
+// --- MUAT DATA DARI CLOUD ---
 function loadCatalogFromCloud() {
     fetch(GOOGLE_SCRIPT_URL + "?t=" + new Date().getTime())
     .then(res => res.json()).then(data => {
         products = data.catalog || []; customers = data.customers || []; transactions = data.transactions || []; cashOuts = data.cashOuts || []; usersData = data.users || [];
-        renderProducts(); renderFinance(); if(document.getElementById('settingsView').style.display === 'block') renderUsers();
-    });
+        saldoAwal = Number(data.saldoAwal) || 0;
+        renderProducts();
+        renderFinance();
+        renderCustomerDatalist();
+        if (document.getElementById('historyView').style.display === 'block') renderHistory();
+        if (document.getElementById('cashOutView').style.display === 'block') renderCashOutList();
+        if (document.getElementById('settingsView').style.display === 'block') renderUsers();
+    }).catch(() => console.error('Gagal memuat data dari server.'));
 }
 
-// (Fungsi render lainnya seperti renderProducts, renderCart, checkoutBtn, dll tetap sama seperti kode Anda sebelumnya)
-// Pastikan fungsi-fungsi pendukung yang Anda miliki tidak terhapus.
+// --- UTILITAS ---
+function formatRupiah(num) {
+    num = Number(num) || 0;
+    return 'Rp ' + num.toLocaleString('id-ID');
+}
 
+function formatDateShort(d) {
+    const date = new Date(d);
+    if (isNaN(date)) return '';
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatWhatsApp(number) {
+    let n = String(number || '').replace(/\D/g, '');
+    if (n.startsWith('0')) n = '62' + n.slice(1);
+    else if (!n.startsWith('62')) n = '62' + n;
+    return n;
+}
+
+// --- MODUL KASIR (POS): PRODUK & KERANJANG ---
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeCategory = btn.dataset.category;
+        renderProducts();
+    });
+});
+
+function renderProducts() {
+    if (!productGrid) return;
+    const filtered = products.filter(p => (p.category || 'Kiloan') === activeCategory);
+    if (filtered.length === 0) {
+        productGrid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:13px;padding:20px 0;">Belum ada layanan di kategori ini.</p>';
+        return;
+    }
+    productGrid.innerHTML = filtered.map(p => `
+        <div class="product-card" data-productid="${p.id}">
+            <h4>${p.name}</h4>
+            <p>${formatRupiah(p.price)}${p.category === 'Kiloan' ? '/kg' : ''}</p>
+            ${hasCatalogAccess() ? `<button class="delete-product-btn" title="Hapus" onclick="event.stopPropagation(); deleteProduct('${p.id}')">×</button>` : ''}
+        </div>
+    `).join('');
+}
+
+productGrid.addEventListener('click', (e) => {
+    const card = e.target.closest('.product-card');
+    if (!card || e.target.classList.contains('delete-product-btn')) return;
+    const product = products.find(p => String(p.id) === card.dataset.productid);
+    if (product) addToCart(product);
+});
+
+function addToCart(product) {
+    const existing = cart.find(it => it.id === product.id);
+    if (existing) {
+        if (existing.category === 'Kiloan') existing.weight = Number(existing.weight) + 1;
+        else existing.qty += 1;
+    } else {
+        cart.push({
+            cartId: 'c' + Date.now() + Math.random().toString(16).slice(2),
+            id: product.id,
+            name: product.name,
+            price: Number(product.price),
+            category: product.category,
+            qty: 1,
+            weight: product.category === 'Kiloan' ? 1 : null
+        });
+    }
+    renderCart();
+    switchView('posView');
+}
+
+function renderCart() {
+    if (!cartItemsContainer) return;
+    if (cart.length === 0) {
+        cartItemsContainer.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;padding:15px 0;">Belum ada item dipilih.</p>';
+    } else {
+        cartItemsContainer.innerHTML = cart.map(it => {
+            const subtotal = it.category === 'Kiloan' ? it.price * it.weight : it.price * it.qty;
+            const controlHtml = it.category === 'Kiloan'
+                ? `<input type="number" min="0.1" step="0.1" class="qty-input cart-qty-input" data-cartid="${it.cartId}" data-field="weight" value="${it.weight}"> kg`
+                : `<input type="number" min="1" step="1" class="qty-input cart-qty-input" data-cartid="${it.cartId}" data-field="qty" value="${it.qty}"> pcs`;
+            return `
+            <div class="cart-item-row" data-cartid="${it.cartId}">
+                <div class="cart-item-info">
+                    <span>${it.name}</span>
+                    <div class="cart-item-qty">
+                        ${controlHtml}
+                        <span style="font-size:12px;color:var(--text-muted);">@ ${formatRupiah(it.price)}</span>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="cart-subtotal" style="font-weight:700;font-size:13px;">${formatRupiah(subtotal)}</span>
+                    <button class="btn-remove" data-cartid="${it.cartId}">✕</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+    calculateTotal();
+}
+
+cartItemsContainer.addEventListener('input', (e) => {
+    if (!e.target.classList.contains('cart-qty-input')) return;
+    const id = e.target.dataset.cartid, field = e.target.dataset.field;
+    const item = cart.find(c => c.cartId === id);
+    if (!item) return;
+    let val = parseFloat(e.target.value);
+    if (isNaN(val) || val <= 0) val = field === 'weight' ? 0.1 : 1;
+    item[field] = val;
+    const row = e.target.closest('.cart-item-row');
+    const subtotal = item.category === 'Kiloan' ? item.price * item.weight : item.price * item.qty;
+    row.querySelector('.cart-subtotal').innerText = formatRupiah(subtotal);
+    calculateTotal();
+});
+
+cartItemsContainer.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('btn-remove')) return;
+    const id = e.target.dataset.cartid;
+    cart = cart.filter(c => c.cartId !== id);
+    renderCart();
+});
+
+function calculateTotal() {
+    const total = cart.reduce((s, it) => s + (it.category === 'Kiloan' ? it.price * it.weight : it.price * it.qty), 0);
+    const totalEl = document.getElementById('totalPrice');
+    if (totalEl) totalEl.innerText = formatRupiah(total);
+    updateChange();
+    return total;
+}
+
+function updateChange() {
+    const statusEl = document.getElementById('paymentStatus');
+    const cashInput = document.getElementById('cashGiven');
+    const changeEl = document.getElementById('changeAmount');
+    if (!statusEl || !cashInput || !changeEl) return;
+    const totalText = document.getElementById('totalPrice').innerText.replace(/[^0-9]/g, '');
+    const total = Number(totalText) || 0;
+    if (statusEl.value === 'Belum Lunas') {
+        cashInput.value = '';
+        cashInput.disabled = true;
+        changeEl.innerText = formatRupiah(0);
+        changeEl.style.color = '';
+        return;
+    }
+    cashInput.disabled = false;
+    const cash = Number(cashInput.value) || 0;
+    const change = cash - total;
+    changeEl.innerText = formatRupiah(change);
+    changeEl.style.color = change < 0 ? 'var(--danger)' : '';
+}
+
+document.getElementById('paymentStatus').addEventListener('change', updateChange);
+document.getElementById('cashGiven').addEventListener('input', updateChange);
+
+function renderCustomerDatalist() {
+    const list = document.getElementById('customerList');
+    if (!list) return;
+    list.innerHTML = customers.map(c => `<option value="${c.name}">`).join('');
+}
+
+document.getElementById('customerName').addEventListener('input', (e) => {
+    const match = customers.find(c => c.name === e.target.value);
+    if (match) document.getElementById('customerWA').value = String(match.wa || '').replace(/^'/, '');
+});
+
+// --- MODUL KASIR: CHECKOUT / TRANSAKSI ---
+function buildItemsSummary(cartArr) {
+    return cartArr.map(it => it.category === 'Kiloan' ? `${it.name} ${it.weight}kg` : `${it.name} x${it.qty}`).join(', ');
+}
+
+function generateInvoiceNumber() {
+    const now = new Date();
+    const y = now.getFullYear().toString().slice(-2);
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const todayCount = transactions.filter(t => {
+        const td = new Date(t.date);
+        return !isNaN(td) && td.getFullYear() === now.getFullYear() && td.getMonth() === now.getMonth() && td.getDate() === now.getDate();
+    }).length + 1;
+    return `INV${y}${m}${d}${String(todayCount).padStart(3, '0')}`;
+}
+
+checkoutBtn.addEventListener('click', async () => {
+    if (cart.length === 0) { alert('Keranjang masih kosong!'); return; }
+    const customerName = document.getElementById('customerName').value.trim();
+    const customerWA = document.getElementById('customerWA').value.trim();
+    if (!customerName) { alert('Nama pelanggan wajib diisi!'); return; }
+    const status = document.getElementById('paymentStatus').value;
+    const total = calculateTotal();
+    const cash = status === 'Lunas' ? (Number(document.getElementById('cashGiven').value) || 0) : 0;
+    if (status === 'Lunas' && cash < total) { alert('Uang tunai kurang dari total tagihan!'); return; }
+    const change = status === 'Lunas' ? cash - total : 0;
+    const invoice = generateInvoiceNumber();
+    const itemsSummary = buildItemsSummary(cart);
+
+    checkoutBtn.disabled = true;
+    checkoutBtn.innerText = 'Memproses...';
+    try {
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'transaction', invoice, items: itemsSummary, total, cash, change, customerName, customerWA, paymentStatus: status })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+            const trx = { invoice, items: itemsSummary, total, name: customerName, wa: customerWA, status };
+            alert(`Transaksi ${invoice} berhasil disimpan!`);
+            if (customerWA && confirm('Kirim struk ke WhatsApp pelanggan sekarang?')) sendReceiptWA(trx);
+            cart = [];
+            document.getElementById('customerName').value = '';
+            document.getElementById('customerWA').value = '';
+            document.getElementById('cashGiven').value = '';
+            document.getElementById('paymentStatus').value = 'Lunas';
+            renderCart();
+            loadCatalogFromCloud();
+            switchView('dashboardView');
+        } else {
+            alert('Gagal menyimpan transaksi: ' + (result.message || 'Terjadi kesalahan'));
+        }
+    } catch (err) {
+        alert('Gagal terhubung ke server. Cek koneksi internet Anda.');
+    } finally {
+        checkoutBtn.disabled = false;
+        checkoutBtn.innerText = 'Selesaikan Transaksi';
+    }
+});
+
+// --- MODUL RIWAYAT TRANSAKSI & KIRIM WA ---
+function renderHistory() {
+    const container = document.getElementById('historyList');
+    if (!container) return;
+    if (transactions.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Belum ada transaksi.</p>';
+        return;
+    }
+    const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    container.innerHTML = sorted.map(t => `
+        <div class="history-card">
+            <div class="hc-top">
+                <span class="hc-inv">${t.invoice}</span>
+                <span class="badge ${t.status === 'Lunas' ? 'lunas' : 'belum'}">${t.status}</span>
+            </div>
+            <div class="hc-date">${formatDateShort(t.date)}</div>
+            <div class="hc-middle">${t.items}</div>
+            <div class="hc-bottom">
+                <span class="hc-cust">${t.name || '-'}</span>
+                <span class="hc-total">${formatRupiah(t.total)}</span>
+            </div>
+            ${t.wa ? `<button class="btn-wa" data-invoice="${t.invoice}">📲 Kirim Struk WA</button>` : ''}
+        </div>
+    `).join('');
+}
+
+document.getElementById('historyList').addEventListener('click', (e) => {
+    if (!e.target.classList.contains('btn-wa')) return;
+    const inv = e.target.dataset.invoice;
+    const trx = transactions.find(t => t.invoice === inv);
+    if (trx) sendReceiptWA(trx);
+});
+
+document.getElementById('refreshHistoryBtn').addEventListener('click', () => loadCatalogFromCloud());
+
+function sendReceiptWA(trx) {
+    if (!trx.wa) { alert('Nomor WhatsApp pelanggan tidak tersedia.'); return; }
+    const wa = formatWhatsApp(trx.wa);
+    const pesan = `Halo ${trx.name || ''}, terima kasih sudah menggunakan Purify Laundry & Dry Cleaning!\n\n` +
+        `No. Invoice: ${trx.invoice}\n` +
+        `Rincian: ${trx.items}\n` +
+        `Total: ${formatRupiah(trx.total)}\n` +
+        `Status: ${trx.status}\n\n` +
+        `Terima kasih! 🙏`;
+    window.open(`https://wa.me/${wa}?text=${encodeURIComponent(pesan)}`, '_blank');
+}
+
+// --- MODUL KAS KELUAR ---
+function renderCashOutList() {
+    const container = document.getElementById('cashOutList');
+    if (!container) return;
+    if (cashOuts.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Belum ada pengeluaran.</p>';
+        return;
+    }
+    const sorted = [...cashOuts].sort((a, b) => new Date(b.date) - new Date(a.date));
+    container.innerHTML = sorted.map(c => `
+        <div class="history-card">
+            <div class="hc-top"><span class="hc-inv">${c.description}</span><span class="hc-date">${formatDateShort(c.date)}</span></div>
+            <div class="hc-bottom"><span class="hc-cust">${c.user || ''}</span><span class="hc-total" style="color:var(--danger)">- ${formatRupiah(c.amount)}</span></div>
+        </div>
+    `).join('');
+}
+
+document.getElementById('openCashOutModal').addEventListener('click', () => {
+    document.getElementById('coDescription').value = '';
+    document.getElementById('coAmount').value = '';
+    document.getElementById('cashOutModal').style.display = 'flex';
+});
+
+document.getElementById('cancelCoBtn').addEventListener('click', () => {
+    document.getElementById('cashOutModal').style.display = 'none';
+});
+
+document.getElementById('saveCoBtn').addEventListener('click', async () => {
+    const desc = document.getElementById('coDescription').value.trim();
+    const amount = Number(document.getElementById('coAmount').value);
+    if (!desc || !amount || amount <= 0) { alert('Lengkapi keterangan & jumlah dengan benar!'); return; }
+    const btn = document.getElementById('saveCoBtn');
+    btn.disabled = true; btn.innerText = 'Menyimpan...';
+    try {
+        const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'cash_out', date: new Date().toISOString(), description: desc, amount, user: currentUser.username }) });
+        const result = await res.json();
+        if (result.status === 'success') {
+            document.getElementById('cashOutModal').style.display = 'none';
+            loadCatalogFromCloud();
+        } else alert('Gagal menyimpan pengeluaran.');
+    } catch (e) {
+        alert('Gagal terhubung ke server.');
+    } finally {
+        btn.disabled = false; btn.innerText = 'Simpan';
+    }
+});
+
+// --- MODUL TAMBAH/HAPUS LAYANAN ---
+window.openAddProductModal = function() {
+    document.getElementById('newProductName').value = '';
+    document.getElementById('newProductPrice').value = '';
+    document.getElementById('newProductCategory').value = 'Kiloan';
+    document.getElementById('addProductModal').style.display = 'flex';
+};
+
+document.getElementById('cancelAddBtn').addEventListener('click', () => {
+    document.getElementById('addProductModal').style.display = 'none';
+});
+
+document.getElementById('saveProductBtn').addEventListener('click', async () => {
+    const name = document.getElementById('newProductName').value.trim();
+    const price = Number(document.getElementById('newProductPrice').value);
+    const category = document.getElementById('newProductCategory').value;
+    if (!name || !price || price <= 0) { alert('Lengkapi nama & harga dengan benar!'); return; }
+    const btn = document.getElementById('saveProductBtn');
+    btn.disabled = true; btn.innerText = 'Menyimpan...';
+    try {
+        const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'add_product', product: { id: 'P' + Date.now(), name, price, category } }) });
+        const result = await res.json();
+        if (result.status === 'success') {
+            document.getElementById('addProductModal').style.display = 'none';
+            loadCatalogFromCloud();
+        } else alert('Gagal menyimpan layanan.');
+    } catch (e) {
+        alert('Gagal terhubung ke server.');
+    } finally {
+        btn.disabled = false; btn.innerText = 'Simpan';
+    }
+});
+
+window.deleteProduct = function(productId) {
+    if (!confirm('Hapus layanan ini?')) return;
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_product', productId }) })
+    .then(res => res.json()).then(result => {
+        if (result.status === 'success') loadCatalogFromCloud();
+        else alert('Gagal menghapus layanan.');
+    }).catch(() => alert('Gagal terhubung ke server.'));
+};
+
+// --- MODUL KEUANGAN (SALDO) ---
+function renderFinance() {
+    const totalLunas = transactions.filter(t => t.status === 'Lunas').reduce((s, t) => s + Number(t.total || 0), 0);
+    const totalPiutang = transactions.filter(t => t.status !== 'Lunas').reduce((s, t) => s + Number(t.total || 0), 0);
+    const totalKasKeluar = cashOuts.reduce((s, c) => s + Number(c.amount || 0), 0);
+    const saldoAktual = saldoAwal + totalLunas - totalKasKeluar;
+    const saldoProyeksi = saldoAktual + totalPiutang;
+    const elAktual = document.getElementById('saldoAktualTxt');
+    const elProyeksi = document.getElementById('saldoProyeksiTxt');
+    if (elAktual) elAktual.innerText = formatRupiah(saldoAktual);
+    if (elProyeksi) elProyeksi.innerText = formatRupiah(saldoProyeksi);
+}
+
+window.setSaldoAwal = function() {
+    const input = prompt('Masukkan saldo awal kas (Rp):', saldoAwal || 0);
+    if (input === null) return;
+    const amount = Number(String(input).replace(/[^0-9-]/g, ''));
+    if (isNaN(amount)) { alert('Input tidak valid.'); return; }
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'set_saldo_awal', amount }) })
+    .then(res => res.json()).then(result => {
+        if (result.status === 'success') { saldoAwal = amount; renderFinance(); alert('Saldo awal diperbarui.'); }
+        else alert('Gagal menyimpan saldo awal.');
+    }).catch(() => alert('Gagal terhubung ke server.'));
+};
+
+// --- INISIALISASI ---
 checkSession();
