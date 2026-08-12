@@ -697,7 +697,7 @@ setInterval(() => {
     const clockEl = document.getElementById('liveClock');
     if (clockEl) {
         const now = new Date();
-        clockEl.innerText = now.toLocaleTimeString('id-ID');
+        clockEl.innerText = now.toLocaleTimeString('id-ID', { hour12: false });
     }
 }, 1000);
 
@@ -738,6 +738,25 @@ async function submitAttendance(type) {
     }
 }
 
+// Fungsi pembantu untuk membersihkan format tanggal/waktu yang berantakan dari spreadsheet
+function cleanDateTime(val, isTime = false) {
+    if (!val) return '-';
+    let str = String(val);
+    
+    // Jika mengandung format ISO atau 1899 dari spreadsheet
+    if (str.includes('T') || str.includes('1899')) {
+        let d = new Date(str);
+        if (!isNaN(d)) {
+            if (isTime) {
+                return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            } else {
+                return d.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            }
+        }
+    }
+    return str;
+}
+
 function renderAttendanceList() {
     const container = document.getElementById('attendanceList');
     if (!container) return;
@@ -750,7 +769,7 @@ function renderAttendanceList() {
         <div class="history-card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <span style="font-weight:700; font-size:13px;">👤 ${a.username} (${a.role || 'Staff'})</span><br>
-                <span style="font-size:11px; color:var(--text-muted);">📅 ${a.tanggal || '-'} | ⏰ ${a.waktu || '-'}</span>
+                <span style="font-size:11px; color:var(--text-muted);">📅 ${cleanDateTime(a.tanggal, false)} | ⏰ ${cleanDateTime(a.waktu, true)}</span>
             </div>
             <span class="badge ${a.type === 'Masuk' ? 'lunas' : 'belum'}" style="padding: 4px 10px; font-size: 11px;">
                 ${a.type}
