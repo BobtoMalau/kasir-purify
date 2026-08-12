@@ -7,35 +7,48 @@ const productGrid = document.getElementById('productGrid'), cartItemsContainer =
 // --- SISTEM LOGIN & OTORISASI ---
 function checkSession() {
     const savedUser = localStorage.getItem('purify_session');
-    if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        loginScreen.style.display = 'none';
-        mainApp.style.display = 'block';
-        activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
-        if (document.getElementById('welcomeGreeting')) document.getElementById('welcomeGreeting').innerText = `Halo, ${currentUser.username} 👋`;
-
-        // Logika Hak Akses
-        const perms = currentUser.permissions ? currentUser.permissions.split(',') : [];
-        const isOwner = currentUser.role.toLowerCase() === 'owner';
-        const hasAccess = (feature) => isOwner || perms.includes(feature);
-
-        // Update Tampilan UI berdasarkan hak akses
-        if (document.getElementById('financeCard')) document.getElementById('financeCard').style.display = hasAccess('finance') ? 'block' : 'none';
-        
-        const toggleCard = (id, key) => { const el = document.getElementById(id); if (el) el.style.display = hasAccess(key) ? 'flex' : 'none'; };
-        toggleCard('cardPos', 'pos');
-        toggleCard('cardCashOut', 'cash_out');
-        toggleCard('cardHistory', 'history');
-        toggleCard('cardFinance', 'finance');
-        toggleCard('cardAddService', 'catalog');
-        toggleCard('cardSettings', 'settings');
-
-        switchView('dashboardView');
-        loadCatalogFromCloud();
-    } else {
+    if (!savedUser) {
         loginScreen.style.display = 'flex';
         mainApp.style.display = 'none';
+        return;
     }
+
+    currentUser = JSON.parse(savedUser);
+    loginScreen.style.display = 'none';
+    mainApp.style.display = 'block';
+    
+    activeUserLabel.innerText = `${currentUser.username} (${currentUser.role})`;
+    if (document.getElementById('welcomeGreeting')) {
+        document.getElementById('welcomeGreeting').innerText = `Halo, ${currentUser.username} 👋`;
+    }
+
+    const perms = currentUser.permissions ? currentUser.permissions.split(',') : [];
+    const isOwner = currentUser.role.toLowerCase() === 'owner';
+    const hasAccess = (feature) => isOwner || perms.includes(feature);
+
+    // Update Tampilan Panel Keuangan
+    const financeCard = document.getElementById('financeCard');
+    if (financeCard) financeCard.style.display = hasAccess('finance') ? 'block' : 'none';
+
+    // Update Tampilan Menu (Dengan pengecekan elemen agar tidak error)
+    const menus = [
+        { id: 'cardPos', key: 'pos' },
+        { id: 'cardCashOut', key: 'cash_out' },
+        { id: 'cardHistory', key: 'history' },
+        { id: 'cardFinance', key: 'finance' },
+        { id: 'cardAddService', key: 'catalog' },
+        { id: 'cardSettings', key: 'settings' }
+    ];
+
+    menus.forEach(m => {
+        const el = document.getElementById(m.id);
+        if (el) {
+            el.style.display = hasAccess(m.key) ? 'flex' : 'none';
+        }
+    });
+
+    switchView('dashboardView');
+    loadCatalogFromCloud();
 }
 
 document.getElementById('loginBtn').addEventListener('click', () => {
